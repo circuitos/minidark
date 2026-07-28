@@ -51,6 +51,11 @@
     };
     openBtn.onclick = () => fileIn.click();
 
+    /* RESET: destructive, so it always asks. Modal uses the shared modal
+       classes; ENTER/ESC and focus are handled for keyboard users. */
+    const reset = el("button", null, C().transport.reset); reset.dataset.tt = "reset";
+    reset.onclick = () => confirmReset();
+
     const exp = el("button", null, C().transport.export); exp.dataset.tt = "export";
     exp.onclick = () => MDS.ui.exportDialog.open();
     const les = el("button", null, C().transport.lessons); les.dataset.tt = "lessons";
@@ -58,7 +63,40 @@
     const glo = el("button", null, C().transport.glossary); glo.dataset.tt = "glossary";
     glo.onclick = () => MDS.ui.glossary.open();
 
-    bar.append(logo, sub, nameIn, grow, save, openBtn, fileIn, exp, les, glo);
+    bar.append(logo, sub, nameIn, grow, save, openBtn, fileIn, reset, exp, les, glo);
+  }
+
+  function confirmReset() {
+    const cc = C().confirm;
+    const back = el("div", "modal-back");
+    const modal = el("div", "modal modal-sm");
+    const head = el("div", "modal-head");
+    head.appendChild(el("h2", null, cc.resetTitle));
+    const body = el("div", "modal-body");
+    body.appendChild(el("p", null, cc.resetBody));
+    const foot = el("div", "modal-foot");
+    const grow = el("span", "grow");
+    const cancel = el("button", null, cc.resetCancel);
+    const ok = el("button", "btn-danger", cc.resetOk);
+    const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
+    cancel.onclick = close;
+    ok.onclick = () => {
+      MDS.seq.stop();
+      S().newProject();
+      close();
+      MDS.ui.toast(cc.resetDone);
+    };
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); close(); }
+      else if (e.key === "Enter") { e.preventDefault(); ok.click(); }
+    }
+    document.addEventListener("keydown", onKey);
+    back.onclick = (e) => { if (e.target === back) close(); };
+    foot.append(grow, cancel, ok);
+    modal.append(head, body, foot);
+    back.appendChild(modal);
+    document.body.appendChild(back);
+    ok.focus();
   }
 
   function buildLayout(app) {

@@ -70,8 +70,15 @@ MDS.ui.keyboard = (function () {
     up.onclick = () => { S().sel.octave = Math.min(2, S().sel.octave + 1); render(); };
     nameEl = document.createElement("span");
     const hint = document.createElement("span");
-    hint.className = "seq-help"; hint.textContent = C().kbd.hint;
-    head.append(title, down, up, nameEl, hint);
+    hint.className = "seq-help is-right"; hint.textContent = C().kbd.hint;
+    /* Same cell rhythm as the transport and sequencer headers. */
+    const kCell = (...kids) => {
+      const d = document.createElement("div");
+      d.className = "hd-cell";
+      d.append(...kids);
+      return d;
+    };
+    head.append(kCell(title), kCell(down, up), kCell(nameEl), hint);
 
     const kb = document.createElement("div");
     kb.className = "kbd"; kb.dataset.tt = "kbd";

@@ -11,6 +11,7 @@ MDS.ui.panels = (function () {
   const S = () => MDS.state;
 
   let bodyEl = null, tabBtns = {}, curTab = "inst";
+  let masterFader = null;   // FX/MASTER volume fader, synced with the transport
 
   const fmtHz = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + "k" : Math.round(v) + "");
   const fmtMs = (v) => (v >= 1 ? v.toFixed(2) + "s" : Math.round(v * 1000) + "ms");
@@ -37,21 +38,27 @@ MDS.ui.panels = (function () {
     return k;
   }
 
-  function waveSelect(row, tr, param, labelText, tipKey) {
-    const wrap = document.createElement("label");
-    wrap.className = "tbgroup"; wrap.dataset.tt = tipKey;
-    const l = document.createElement("span"); l.className = "k-label"; l.textContent = labelText;
-    const sel = document.createElement("select");
+  function waveSwitch(container, tr, param, labelText, tipKey) {
+    /* Segmented switch: every waveform is one click away (no dropdown). */
+    const row = document.createElement("div");
+    row.className = "sw-row"; row.dataset.tt = tipKey;
+    const l = document.createElement("span"); l.className = "sw-label"; l.textContent = labelText;
+    const seg = document.createElement("div"); seg.className = "segmented";
+    const btns = [];
+    const valOf = (val) => (val === "saw" ? "sawtooth" : val === "tri" ? "triangle" : val);
     for (const [val, name] of Object.entries(C().inst.waves)) {
-      const o = document.createElement("option");
-      o.value = val === "saw" ? "sawtooth" : val === "tri" ? "triangle" : val;
-      o.textContent = name;
-      sel.appendChild(o);
+      const b = document.createElement("button");
+      b.textContent = name; b.dataset.wave = valOf(val);
+      b.onclick = () => {
+        tr.patch[param] = b.dataset.wave;
+        btns.forEach((x) => x.classList.toggle("is-on", x === b));
+      };
+      seg.appendChild(b); btns.push(b);
     }
-    sel.value = tr.patch[param] || "sawtooth";
-    sel.onchange = () => { tr.patch[param] = sel.value; };
-    wrap.append(l, sel);
-    row.appendChild(wrap);
+    const curVal = tr.patch[param] || "sawtooth";
+    btns.forEach((b) => b.classList.toggle("is-on", b.dataset.wave === curVal));
+    row.append(l, seg);
+    container.appendChild(row);
   }
 
   /* ── Signal path display ───────────────────────────────────────────── */
@@ -123,9 +130,12 @@ MDS.ui.panels = (function () {
 
     const eng = tr.patch ? tr.patch.engine : null;
     if (eng === "sub") {
+      /* Layout: the two waveform switches stack full-width above their knob
+         row, so selectors and dials never share a line awkwardly. */
       const osc = group(C().inst.gOsc, "osc");
-      waveSelect(osc.row, tr, "osc1", C().inst.osc1, "osc1");
-      waveSelect(osc.row, tr, "osc2", C().inst.osc2, "osc2");
+      waveSwitch(osc.g, tr, "osc1", C().inst.osc1, "osc1");
+      waveSwitch(osc.g, tr, "osc2", C().inst.osc2, "osc2");
+      osc.g.appendChild(osc.row);
       patchKnob(osc.row, tr, "mix", { label: C().inst.mix, tip: "mix", min: 0, max: 1, fmt: fmtPct });
       patchKnob(osc.row, tr, "semi", { label: C().inst.semi, tip: "semi", min: -24, max: 24, round: true });
       patchKnob(osc.row, tr, "detune", { label: C().inst.detune, tip: "detune", min: 0, max: 30 });
@@ -203,7 +213,7 @@ MDS.ui.panels = (function () {
       const nm = document.createElement("button");
       nm.className = "s-name"; nm.textContent = C().tracks[tr.key]; nm.dataset.tt = "trackSelect";
       nm.onclick = () => { S().sel.track = ti; MDS.bus.emit("sel"); };
-      const lvl = MDS.ui.knob({
+      const lvl = MDS.ui.fader({
         label: C().mixer.level, tip: "chLevel", min: 0, max: 1.2, value: tr.level, fmt: fmtPct,
         onInput: (v) => { tr.level = v; S().applyMixer(); },
       });
@@ -254,6 +264,17 @@ MDS.ui.panels = (function () {
     const fx = S().project.fx;
     const cf = C().fx;
 
+    /* MASTER first: output level and metering are what you check most, so the
+       glue knob, the volume fader and the live VU sit together on one row. */
+    const ms = group(cf.master, "master");
+    fxKnob(ms.row, S().project.master, "comp", { label: cf.mComp, tip: "mComp", min: 0, max: 1 });
+    masterFader = MDS.ui.fader({
+      label: cf.mVol, tip: "mVol", min: 0, max: 1, value: S().project.master.vol, fmt: fmtPct,
+      onInput: (v) => { S().project.master.vol = v; S().applyAudio(); MDS.bus.emit("master"); },
+    });
+    ms.row.appendChild(masterFader.el);
+    bodyEl.appendChild(ms.g);
+
     const d = group(cf.dist, "fx-dist");
     fxKnob(d.row, fx.dist, "drive", { label: cf.distDrive, tip: "distDrive", min: 0, max: 1 });
     fxKnob(d.row, fx.dist, "tone", { label: cf.distTone, tip: "distTone", min: 0, max: 1 });
@@ -268,7 +289,7 @@ MDS.ui.panels = (function () {
 
     const dl = group(cf.delay, "fx-delay");
     const divWrap = document.createElement("label");
-    divWrap.className = "tbgroup"; divWrap.dataset.tt = "dlyDiv";
+    divWrap.className = "ctl-sel"; divWrap.dataset.tt = "dlyDiv";
     const dvl = document.createElement("span"); dvl.className = "k-label"; dvl.textContent = cf.dlyDiv;
     const dsel = document.createElement("select");
     for (const [val, name] of Object.entries(cf.divisions)) {
@@ -277,7 +298,7 @@ MDS.ui.panels = (function () {
     }
     dsel.value = fx.delay.div;
     dsel.onchange = () => { fx.delay.div = dsel.value; S().applyAudio(); };
-    divWrap.append(dvl, dsel);
+    divWrap.append(dsel, dvl);
     dl.row.appendChild(divWrap);
     fxKnob(dl.row, fx.delay, "fb", { label: cf.dlyFb, tip: "dlyFb", min: 0, max: 0.85 });
     fxKnob(dl.row, fx.delay, "tone", { label: cf.dlyTone, tip: "dlyTone", min: 0, max: 1 });
@@ -294,11 +315,6 @@ MDS.ui.panels = (function () {
     fxKnob(cr.row, fx.crush, "bits", { label: cf.crushBits, tip: "crushBits", min: 2, max: 12, round: true, fmt: (v) => Math.round(v) + " bit" });
     fxKnob(cr.row, fx.crush, "level", { label: cf.crushLevel, tip: "crushLevel", min: 0, max: 1 });
     bodyEl.appendChild(cr.g);
-
-    const ms = group(cf.master, "master");
-    fxKnob(ms.row, S().project.master, "comp", { label: cf.mComp, tip: "mComp", min: 0, max: 1 });
-    fxKnob(ms.row, S().project.master, "vol", { label: cf.mVol, tip: "mVol", min: 0, max: 1 });
-    bodyEl.appendChild(ms.g);
   }
 
   /* ── LIBRARY tab ───────────────────────────────────────────────────── */
@@ -404,6 +420,12 @@ MDS.ui.panels = (function () {
     MDS.bus.on("sel", () => { if (curTab === "inst" || curTab === "lib") renderers[curTab](); });
     MDS.bus.on("patch", () => { if (curTab === "inst") renderInst(); });
     MDS.bus.on("mix", () => { if (curTab === "mixer") refreshMixer(); });
+    // keep the FX/MASTER volume in step with the transport fader
+    MDS.bus.on("master", () => {
+      if (masterFader && document.contains(masterFader.el)) {
+        masterFader.set(S().project.master.vol, false);
+      }
+    });
     MDS.bus.on("project", () => renderers[curTab]());
   }
 

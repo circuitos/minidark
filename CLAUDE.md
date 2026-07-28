@@ -18,6 +18,7 @@ One owner per fact; link, don't restate.
 | Project state, event bus | `js/state.js` | In-memory only; persistence is file export by design. |
 | Demo tracks | `js/demos.js` | Original compositions as data. Blurbs/names live in CONTENT. |
 | UI components | `js/ui/*` | Wire ENGINE state to controls. Tokens + CONTENT keys only. |
+| Self-hosted fonts (Barlow, IBM Plex Mono + OFL licenses) | `fonts/`, `@font-face` in `css/theme.css` | CSP is `font-src 'self'`: no CDN webfonts, ever. |
 | Boot / CSP | `js/boot.js`, `index.html` | No inline scripts (lint-enforced); CSP meta is in index.html. |
 | Deploy + previews | `.github/workflows/deploy-pages.yml`, `scripts/build-preview-site.mjs` | See Deployment below. |
 | CI gate | `.github/workflows/check.yml`, `scripts/{validate,lint,smoke}.mjs` | Zero-dependency Node scripts; no npm install anywhere. |
@@ -75,8 +76,9 @@ Run all three check scripts before declaring any change done.
   explains but the page won't. Lint checks the script side.
 - ENGINE files must stay DOM-free. `scripts/smoke.mjs` loads them in a bare
   Node vm; a stray `document.` in ENGINE will fail CI (this is a feature).
-- The favicon in `index.html` duplicates two theme colors as a data URI;
-  update it when the palette changes (tokens can't reach it).
+- The favicon in `index.html` duplicates three theme colors (bg0, accent,
+  ink0) as a data URI; update it by hand when the palette changes (tokens
+  can't reach it).
 - Patch-knob changes apply per-note (next scheduled step), mixer/FX/master
   knobs apply live to the running graph. Both are intended.
 - `sendDist`/`sendChor`/`sendDelay`/`sendVerb`/`sendCrush` tooltip keys are
