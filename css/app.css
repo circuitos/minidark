@@ -326,6 +326,16 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 .chain .chip {
   flex: 1 1 0; min-width: 0; padding: var(--sp-1);
   justify-content: center; text-align: center;
+  touch-action: pan-y;   /* vertical scroll stays the page's, sideways is ours */
+}
+/* Held block: lifted out of the chain while it is being repositioned. */
+.chain .chip.is-grabbed {
+  background: var(--c-bg3);
+  border-color: var(--c-accent2);
+  color: var(--c-ink0);
+  transform: translateY(calc(-1 * var(--sp-1)));
+  box-shadow: var(--sh-glow-cyan);
+  cursor: grabbing;
 }
 .chip {
   font-family: var(--font-mono); font-size: var(--fs-s);

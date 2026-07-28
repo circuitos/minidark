@@ -372,7 +372,7 @@ MDS.ui.seq = (function () {
     clear.onclick = () => { S().project.song.length = 0; MDS.bus.emit("song"); };
     const len = document.createElement("span"); len.className = "seq-help"; els.songLen = len;
     const hint = document.createElement("span");
-    hint.className = "seq-help is-right"; hint.textContent = C().seq.chipRemove;
+    hint.className = "seq-help is-right"; hint.textContent = C().seq.chipHint;
     const sCell = (...kids) => {
       const d = document.createElement("div");
       d.className = "hd-cell";
@@ -386,6 +386,59 @@ MDS.ui.seq = (function () {
     root.append(head, chain);
   }
 
+  /* ── Song block drag (hold, then slide) ────────────────────────────────
+     A plain click still removes a block, so the grab has to arm on a HOLD:
+     that delay is the whole difference between "remove this" and "move
+     this". Moving before the hold lands cancels it, the way a long-press
+     should, so a scroll or a mis-swipe never picks a block up. */
+  const HOLD_MS = 500, HOLD_SLOP = 8;
+  let grab = null;         // { pos } chain index currently held
+  let grabTimer = null, grabFrom = null;
+  let grabbed = false;     // a grab happened: swallows the click after it
+
+  function armChipGrab(pos, e) {
+    clearGrabTimer();
+    grabbed = false;
+    grabFrom = { x: e.clientX, y: e.clientY };
+    grabTimer = setTimeout(() => {
+      grab = { pos };
+      grabbed = true;      // held long enough to mean "move", never "remove"
+      refreshSong();
+    }, HOLD_MS);
+    document.addEventListener("pointermove", onChipDrag);
+    document.addEventListener("pointerup", endChipGrab);
+    document.addEventListener("pointercancel", endChipGrab);
+  }
+
+  function onChipDrag(e) {
+    if (!grab) {
+      // still counting down: a real move means the user meant to scroll
+      if (Math.abs(e.clientX - grabFrom.x) > HOLD_SLOP ||
+          Math.abs(e.clientY - grabFrom.y) > HOLD_SLOP) clearGrabTimer();
+      return;
+    }
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || !el.classList.contains("chip")) return;
+    const to = +el.dataset.pos;
+    const song = S().project.song;
+    if (!Number.isInteger(to) || to === grab.pos || to >= song.length) return;
+    song.splice(to, 0, song.splice(grab.pos, 1)[0]);
+    grab.pos = to;
+    MDS.bus.emit("song");
+  }
+
+  function clearGrabTimer() { clearTimeout(grabTimer); grabTimer = null; }
+
+  function endChipGrab() {
+    clearGrabTimer();
+    const held = !!grab;
+    grab = null;
+    document.removeEventListener("pointermove", onChipDrag);
+    document.removeEventListener("pointerup", endChipGrab);
+    document.removeEventListener("pointercancel", endChipGrab);
+    if (held) refreshSong();
+  }
+
   function refreshSong() {
     const song = S().project.song;
     els.chain.innerHTML = "";
@@ -397,9 +450,13 @@ MDS.ui.seq = (function () {
     song.forEach((pIdx, i) => {
       const chip = document.createElement("span");
       chip.className = "chip"; chip.textContent = String(pIdx + 1);
-      chip.title = C().seq.chipRemove;
+      chip.dataset.pos = String(i);
+      chip.title = C().seq.chipHint;
+      if (grab && grab.pos === i) chip.classList.add("is-grabbed");
+      chip.onpointerdown = (e) => { if (e.button === 0) armChipGrab(i, e); };
       chip.onclick = (e) => {
         // shift-click duplicates this slot in place; plain click removes it
+        if (grabbed) return;   // the hold already moved this block
         if (e.shiftKey) song.splice(i + 1, 0, pIdx);
         else song.splice(i, 1);
         MDS.bus.emit("song");

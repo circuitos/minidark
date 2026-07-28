@@ -55,7 +55,7 @@ MDS.CONTENT = {
     songClear: "CLEAR SONG",
     songEmpty: "Song is empty. Add patterns to build a track (30+ bars ≈ one minute).",
     songLen: (bars, secs) => `${bars} bars ≈ ${secs}s`,
-    chipRemove: "click to remove, shift-click to duplicate",
+    chipHint: "click to remove · shift-click to duplicate · hold, then drag to move it along the song",
   },
 
   confirm: {
