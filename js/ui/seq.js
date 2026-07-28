@@ -425,7 +425,10 @@ MDS.ui.seq = (function () {
     if (!ticks.length) return;
     const t = ticks[ticks.length - 1];
     MDS.bus.emit("tick", t);
-    els.pos.textContent = `${C().transport.posBar} ${t.songPos + 1} · ${C().transport.posStep} ${t.step + 1}`;
+    // Two-digit, tabular figures: the readout must not change width as it
+    // counts, or every control to its right in the transport shifts.
+    const pad = (n) => String(n).padStart(2, "0");
+    els.pos.textContent = `${C().transport.posBar} ${pad(t.songPos + 1)} · ${C().transport.posStep} ${pad(t.step + 1)}`;
     // playhead column (only when the playing pattern is the one on screen)
     clearPlayCol();
     const showing = S().sel.pattern;

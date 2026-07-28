@@ -218,9 +218,12 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
   background: transparent;
   border-color: var(--c-accent); color: var(--c-accent);
 }
+/* Fixed width, tabular figures, zero-padded counters (seq.js): the readout is
+   the only text in the transport that changes while playing, so if it can
+   grow, every control to its right jitters. Sized for "bar 128 · step 16". */
 .transport .pos-readout {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
-  color: var(--c-ink1); font-size: var(--fs-s); min-width: 4.6rem;
+  color: var(--c-ink1); font-size: var(--fs-s); min-width: 8.3rem;
 }
 /* Knob and fader columns inside the transport share one label rhythm. */
 .tp-cell .knob, .tp-cell .fader { padding: 0; }
