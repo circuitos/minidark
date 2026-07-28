@@ -81,6 +81,17 @@ Run all three check scripts before declaring any change done.
   can't reach it).
 - Patch-knob changes apply per-note (next scheduled step), mixer/FX/master
   knobs apply live to the running graph. Both are intended.
+- A step's `len` (cell schema in `js/state.js`) is the only way to make a
+  slow patch speak: `padWarm` has a 0.6 s attack, while one 16th at 120 BPM
+  lasts 0.125 s. The grid writes `len` by dragging right across a melody row
+  (`js/ui/seq.js`), and paints the held steps as a tie bar. Demo pads are
+  authored as one chord with `len: 16`, so a pattern loaded from `demos.js`
+  sounds nothing like a hand-entered one until the note is held.
+- `adsr()` in `js/engine/synth.js` pins the envelope's in-flight value before
+  `cancelScheduledValues`. Do not simplify that away: cancelling a
+  `linearRampToValueAtTime` that has not landed yet reverts the param to the
+  ramp's START value, so before this every note shorter than its own attack
+  rendered as exact digital silence, live and in export alike.
 - `sendDist`/`sendChor`/`sendDelay`/`sendVerb`/`sendCrush` tooltip keys are
   built by string concatenation in `js/ui/panels.js`; `validate.mjs` hardcodes
   that list. Change one, change both.

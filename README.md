@@ -27,7 +27,8 @@ touched a synthesizer.
 - **Effects**: waveshaper distortion, chorus, tempo-synced delay, convolution
   reverb with a procedurally generated impulse response, bitcrusher, plus a
   glue-compressed, limited master bus so beginners can't clip.
-- **16-step sequencer**, 8 tracks, accents, 8-pattern bank, song mode
+- **16-step sequencer**, 8 tracks, accents, note lengths (drag a melody step
+  right to hold it), 8-pattern bank, song mode
   (chains 30+ bars), scale lock, swing, lookahead scheduling on the audio
   clock (no drift).
 - **Playable keyboard** (mouse/touch + QWERTY) over the running sequencer.

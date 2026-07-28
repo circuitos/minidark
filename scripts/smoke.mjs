@@ -57,6 +57,26 @@ for (const id of MDS.demos.ids()) {
   ok(`sequencer: demo "${id}" scheduled ${n} notes across ${p.song.length} bars without error`);
 }
 
+/* ── note length: cell.len scales the scheduled duration ───────────────── */
+{
+  const seen = [];
+  const stub = sandbox.MDS.synth;
+  sandbox.MDS.synth = { trigger: (g, ti, patch, opts) => seen.push(opts) };
+  const p = MDS.state.defaultProject();
+  const PAD = 6;
+  p.patterns[0].steps[PAD][0] = { on: true, acc: false, note: 57, len: 8 };
+  p.patterns[0].steps[PAD][8] = { on: true, acc: false, note: 57 };
+  const sDur = 60 / p.bpm / 4, gate = p.tracks[PAD].gate;
+  for (let s = 0; s < 16; s++) MDS.seq.scheduleStep(null, p, 0, s, s * sDur, sDur, null);
+  assert(seen.length === 2, `pad row scheduled ${seen.length} notes (want 2)`);
+  assert(Math.abs(seen[0].dur - sDur * gate * 8) < 1e-9, `len:8 note lasted ${seen[0].dur}s`);
+  assert(Math.abs(seen[1].dur - sDur * gate) < 1e-9, `note without len lasted ${seen[1].dur}s`);
+  // The reason len exists at all: a pad's attack outlives a single 16th.
+  assert(seen[0].dur > p.tracks[PAD].patch.a, "held pad note is shorter than its own attack");
+  sandbox.MDS.synth = stub;
+  ok("sequencer: cell.len scales note duration (a held pad outlasts its attack)");
+}
+
 /* ── WAV encoder against a fake AudioBuffer ────────────────────────────── */
 const N = 44100;
 const chan = new Float32Array(N);

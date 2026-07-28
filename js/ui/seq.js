@@ -190,8 +190,14 @@ MDS.ui.seq = (function () {
       for (let si = 0; si < 16; si++) {
         const cell = document.createElement("div");
         cell.className = "cell";
+        cell.dataset.ti = String(ti); cell.dataset.si = String(si);
         if (si % 4 === 0 && si !== 0) cell.dataset.beat = "1";
-        cell.onclick = () => toggleCell(ti, si);
+        cell.onpointerdown = (e) => { if (e.button === 0) startLenDrag(ti, si); };
+        cell.onclick = (e) => {
+          if (dragMoved) return;              // the drag already edited this note
+          if (e.shiftKey && trackIsMelodic(ti)) { growLen(ti, si); return; }
+          toggleCell(ti, si);
+        };
         cell.oncontextmenu = (e) => { e.preventDefault(); accentCell(ti, si); };
         cell.onwheel = (e) => { e.preventDefault(); nudgeNote(ti, si, e.deltaY < 0 ? 1 : -1); };
         row.appendChild(cell);
@@ -224,14 +230,73 @@ MDS.ui.seq = (function () {
 
   function cellAt(ti, si) { return S().project.patterns[S().sel.pattern].steps[ti][si]; }
 
+  /* Pitch written into a step that has none yet: the keyboard's last note for
+     the selected track, the track's own base note otherwise. */
+  function entryNote(ti) {
+    const raw = ti === S().sel.track ? S().sel.entryNote : S().project.tracks[ti].baseNote;
+    return maybeSnap(raw);
+  }
+
   function toggleCell(ti, si) {
     const cell = cellAt(ti, si);
     cell.on = !cell.on;
-    if (cell.on && trackIsMelodic(ti) && cell.note == null) {
-      const raw = ti === S().sel.track ? S().sel.entryNote : S().project.tracks[ti].baseNote;
-      cell.note = maybeSnap(raw);
-    }
+    if (cell.on && trackIsMelodic(ti) && cell.note == null) cell.note = entryNote(ti);
     MDS.bus.emit("pattern");
+  }
+
+  /* ── Note length ───────────────────────────────────────────────────────
+     A cell's `len` (see the schema in state.js) is what lets slow sounds
+     speak: a pad with a 600 ms attack never opens inside one 16th. Drag
+     right from a step to hold it over several, shift-click to grow by one.
+     Lengths clamp to the end of the bar and only apply to melodic rows. */
+  let drag = null;        // { ti, si, len } anchor of an in-progress drag
+  let dragMoved = false;  // true once a drag edited; swallows the click after it
+
+  function setLen(ti, si, len) {
+    const cell = cellAt(ti, si);
+    const n = Math.max(1, Math.min(16 - si, len));
+    if (!cell.on) {
+      cell.on = true;
+      if (cell.note == null) cell.note = entryNote(ti);
+    }
+    cell.len = n;
+    MDS.bus.emit("pattern");
+  }
+
+  function growLen(ti, si) {
+    const cell = cellAt(ti, si);
+    setLen(ti, si, cell.on ? (cell.len || 1) + 1 : 1);
+  }
+
+  function startLenDrag(ti, si) {
+    dragMoved = false;
+    if (!trackIsMelodic(ti)) return;
+    const cell = cellAt(ti, si);
+    drag = { ti, si, len: cell.on ? (cell.len || 1) : 1 };
+    document.addEventListener("pointermove", onLenDrag);
+    document.addEventListener("pointerup", endLenDrag);
+    document.addEventListener("pointercancel", endLenDrag);
+  }
+
+  /* elementFromPoint (not pointerenter) so a drag also tracks under touch,
+     where the pointer stays captured by the cell it started on. */
+  function onLenDrag(e) {
+    if (!drag) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || !el.classList.contains("cell")) return;
+    if (+el.dataset.ti !== drag.ti) return;
+    const len = +el.dataset.si - drag.si + 1;
+    if (len < 1 || len === drag.len) return;
+    drag.len = len;
+    dragMoved = true;
+    setLen(drag.ti, drag.si, len);
+  }
+
+  function endLenDrag() {
+    drag = null;
+    document.removeEventListener("pointermove", onLenDrag);
+    document.removeEventListener("pointerup", endLenDrag);
+    document.removeEventListener("pointercancel", endLenDrag);
   }
 
   function accentCell(ti, si) {
@@ -268,14 +333,27 @@ MDS.ui.seq = (function () {
       heads.rh.classList.toggle("is-sel", S().sel.track === ti);
       heads.mute.classList.toggle("is-on", tr.mute);
       heads.solo.classList.toggle("is-on", tr.solo);
+      const melodic = trackIsMelodic(ti);
       for (let si = 0; si < 16; si++) {
         const cell = pat.steps[ti][si];
         const el = cells[ti][si];
         el.classList.toggle("is-on", !!cell.on);
         el.classList.toggle("is-accent", !!(cell.on && cell.acc));
-        if (cell.on && trackIsMelodic(ti) && cell.note != null) {
+        el.classList.remove("is-tail");   // recomputed from `len` below
+        if (cell.on && melodic && cell.note != null) {
           el.textContent = MDS.dsp.noteName(cell.note) + (cell.notes && cell.notes.length > 1 ? "+" : "");
         } else el.textContent = "";
+      }
+      // Held notes paint their extra steps as a tie bar, so `len` is visible.
+      if (melodic) {
+        for (let si = 0; si < 16; si++) {
+          const cell = pat.steps[ti][si];
+          if (!cell.on || !(cell.len > 1)) continue;
+          const end = Math.min(16, si + cell.len);
+          for (let k = si + 1; k < end; k++) {
+            if (!pat.steps[ti][k].on) cells[ti][k].classList.add("is-tail");
+          }
+        }
       }
     }
     for (let i = 0; i < 8; i++) els.bankBtns[i].classList.toggle("is-cur", S().sel.pattern === i);

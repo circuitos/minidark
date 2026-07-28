@@ -42,7 +42,12 @@ MDS.synth = (function () {
     param.setTargetAtTime(s, t0 + a, d / 3);
     return function release(tOff) {
       const r = Math.max(0.01, p.r || 0.05);
+      // A note can end mid-attack (a short step on a slow patch). Cancelling a
+      // linear ramp that has not landed yet reverts the param to the ramp's
+      // START value, i.e. silence, so pin the level the attack really reached.
+      const held = tOff < t0 + a ? peak * Math.max(0, (tOff - t0) / a) : null;
       param.cancelScheduledValues(tOff);
+      if (held != null) param.setValueAtTime(held, tOff);
       param.setTargetAtTime(0, tOff, r / 3);
       return tOff + r * 4 + 0.05; // safe stop time
     };

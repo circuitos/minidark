@@ -299,6 +299,15 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
   outline: calc(var(--bw) * 2) solid var(--c-white); outline-offset: calc(-2 * var(--bw));
   z-index: 1;
 }
+/* Held note (cell.len > 1): the steps it covers read as one tie bar in the
+   row hue, bridging the gap back to the step that started it. */
+.cell.is-tail::after {
+  content: ""; position: absolute; top: 50%; right: 0;
+  left: calc(-1 * (var(--cell-gap) + var(--bw)));
+  height: calc(var(--bw) * 3); transform: translateY(-50%);
+  background: var(--row-hue); opacity: 0.5; border-radius: var(--r-s);
+}
+.cell.is-tail[data-beat="1"]::after { left: calc(-1 * (var(--cell-beat-gap) + var(--cell-gap) + var(--bw))); }
 .seq-help { color: var(--c-ink2); font-size: var(--fs-xs); }
 
 /* ── Song mode ────────────────────────────────────────────────────────── */
