@@ -1,0 +1,104 @@
+/* ============================================================================
+   ███ THEME ███  DESIGN TOKENS — the ONLY place where colors, fonts, spacing,
+   radii, shadows and knob visual parameters are defined.
+   ----------------------------------------------------------------------------
+   A later design pass restyles the whole app by editing THIS FILE ONLY.
+   Components (css/app.css, js/ui/*) reference tokens exclusively — no hex
+   values, no magic pixel numbers outside this file.
+   ----------------------------------------------------------------------------
+   Token groups:
+     1. Palette        --c-*        (named colors; v1 is neutral/functional)
+     2. Track hues     --track-*    (8 sequencer track identity colors)
+     3. Typography     --font-*, --fs-*  (type roles + size scale)
+     4. Spacing scale  --sp-*       (all gaps/paddings derive from this)
+     5. Radii          --r-*
+     6. Borders        --bw
+     7. Shadows        --sh-*
+     8. Component metrics: knobs, sequencer cells, keyboard keys, panels
+   ========================================================================== */
+:root {
+  /* 1 ── Palette (v1: dark neutral studio; the design pass owns the look) */
+  --c-bg0: #0d0e11;          /* app background            */
+  --c-bg1: #16181d;          /* panel background          */
+  --c-bg2: #1f2229;          /* raised surface / cells    */
+  --c-bg3: #2a2e37;          /* hover / active surface    */
+  --c-line: #343945;         /* borders, separators       */
+  --c-ink0: #e8eaef;         /* primary text              */
+  --c-ink1: #a8adb8;         /* secondary text            */
+  --c-ink2: #6b7180;         /* muted text / labels       */
+  --c-accent: #e0483c;       /* primary accent (play, active steps, alerts) */
+  --c-accent-soft: #7a2d27;  /* accent, dimmed            */
+  --c-accent2: #4c9be0;      /* secondary accent (links, selection, focus) */
+  --c-ok: #4cb96a;           /* success / power LED       */
+  --c-warn: #d8a13c;         /* warnings / notices        */
+  --c-black: #000000;        /* shadow base only          */
+  --c-white: #ffffff;        /* highlight base only       */
+
+  /* 2 ── Track identity hues (row LEDs, playhead tint, mixer strips) */
+  --track-0: #d9543f;  /* kick  */
+  --track-1: #d98a3f;  /* snare */
+  --track-2: #d9c43f;  /* hat   */
+  --track-3: #8fd93f;  /* perc  */
+  --track-4: #3fd9a8;  /* bass  */
+  --track-5: #3fa8d9;  /* lead  */
+  --track-6: #7a6bd9;  /* pad   */
+  --track-7: #c95fd9;  /* arp   */
+
+  /* 3 ── Typography */
+  --font-ui: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --fs-xs: 0.66rem;
+  --fs-s: 0.76rem;
+  --fs-m: 0.88rem;
+  --fs-l: 1.05rem;
+  --fs-xl: 1.4rem;
+  --lh: 1.45;
+
+  /* 4 ── Spacing scale */
+  --sp-1: 0.2rem;
+  --sp-2: 0.4rem;
+  --sp-3: 0.65rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2.2rem;
+
+  /* 5 ── Radii */
+  --r-s: 3px;
+  --r-m: 6px;
+  --r-l: 12px;
+
+  /* 6 ── Border width */
+  --bw: 1px;
+
+  /* 7 ── Shadows */
+  --sh-1: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --sh-2: 0 6px 24px rgba(0, 0, 0, 0.6);
+  --sh-glow-accent: 0 0 6px rgba(224, 72, 60, 0.7);
+
+  /* 8 ── Component metrics */
+  /* Knob visuals (read by js/ui/knob.js as CSS vars where possible) */
+  --knob-size: 46px;         /* outer diameter                       */
+  --knob-size-s: 34px;       /* small knob (mixer sends)             */
+  --knob-track: #343945;     /* arc background stroke                */
+  --knob-fill: #4c9be0;      /* arc value stroke                     */
+  --knob-pointer: #e8eaef;   /* pointer line                         */
+  --knob-stroke-w: 4;        /* SVG stroke width (unitless, viewBox) */
+  --knob-body: #1f2229;      /* knob face                            */
+
+  /* Sequencer grid */
+  --cell-w: 2.1rem;
+  --cell-h: 2.1rem;
+  --cell-gap: 0.22rem;
+  --cell-beat-gap: 0.55rem;  /* extra gap every 4 steps */
+
+  /* On-screen keyboard */
+  --kb-white-w: 2.6rem;
+  --kb-white-h: 6.2rem;
+  --kb-black-w: 1.6rem;
+  --kb-black-h: 3.8rem;
+
+  /* Layout */
+  --panel-w: 30rem;          /* right-hand panel width at laptop size */
+  --topbar-h: 3.4rem;
+  --maxw: 100rem;
+}
