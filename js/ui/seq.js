@@ -22,12 +22,30 @@ MDS.ui.seq = (function () {
 
     const play = document.createElement("button");
     play.className = "t-btn"; play.dataset.tt = "play";
-    play.textContent = c.play;
+    const playIcon = document.createElement("span");
+    playIcon.className = "t-icon";
+    const playLabel = document.createElement("span");
+    playLabel.textContent = c.play;
+    play.append(playIcon, playLabel);
     play.onclick = () => { S().ensureAudio(); MDS.seq.toggle(); };
-    els.play = play;
+    els.play = play; els.playLabel = playLabel;
 
     const pos = document.createElement("span");
     pos.className = "pos-readout"; els.pos = pos;
+
+    /* Global output level plus the live VU, grouped at the right end of the
+       transport so level and metering read together. */
+    const vol = MDS.ui.fader({
+      label: C().fx.mVol, tip: "mVol",
+      min: 0, max: 1, value: S().project.master.vol,
+      fmt: (v) => Math.round(v * 100) + "%",
+      onInput: (v) => { S().project.master.vol = v; S().applyAudio(); MDS.bus.emit("master"); },
+    });
+    els.masterVol = vol;
+    const outGroup = document.createElement("div");
+    outGroup.className = "out-group";
+    outGroup.appendChild(vol.el);
+    if (MDS.ui.meter) outGroup.appendChild(MDS.ui.meter.create({ compact: true }));
 
     const tempo = MDS.ui.knob({
       label: c.tempo, tip: "tempo", min: 60, max: 180, value: S().project.bpm,
@@ -75,7 +93,24 @@ MDS.ui.seq = (function () {
     modeWrap.append(mPat, mSong);
     els.syncMode = syncMode;
 
-    root.append(play, pos, tempo.el, swing.el, keyWrap, lock, modeWrap);
+    const spacer = document.createElement("span");
+    spacer.className = "grow";
+    /* Grouped into equal-height cells with hairline separators so every
+       control sits on one rhythm instead of floating at its own height. */
+    const cell = (...kids) => {
+      const d = document.createElement("div");
+      d.className = "tp-cell";
+      d.append(...kids);
+      return d;
+    };
+    root.append(
+      cell(play, pos),
+      cell(tempo.el, swing.el),
+      cell(keyWrap, lock),
+      cell(modeWrap),
+      spacer,
+      outGroup
+    );
     syncLock(); syncMode();
   }
 
@@ -111,7 +146,14 @@ MDS.ui.seq = (function () {
     };
     const clr = document.createElement("button"); clr.textContent = C().seq.clear; clr.dataset.tt = "patClear";
     clr.onclick = () => { S().project.patterns[S().sel.pattern] = S().emptyPattern(); MDS.bus.emit("pattern"); };
-    head.append(title, bank, cp, pst, clr);
+    /* Same cell rhythm as the transport: label, bank, edit actions. */
+    const hCell = (...kids) => {
+      const d = document.createElement("div");
+      d.className = "hd-cell";
+      d.append(...kids);
+      return d;
+    };
+    head.append(hCell(title), hCell(bank), hCell(cp, pst, clr));
 
     const scroll = document.createElement("div");
     scroll.className = "grid-scroll";
@@ -159,6 +201,19 @@ MDS.ui.seq = (function () {
       grid.appendChild(row);
     }
     scroll.appendChild(grid);
+
+    /* Per-column step LEDs above the grid, aligned to the cell rhythm. */
+    const leds = document.createElement("div");
+    leds.className = "col-leds";
+    els.colLeds = [];
+    for (let si = 0; si < 16; si++) {
+      const d = document.createElement("span");
+      d.className = "col-led";
+      if (si % 4 === 0) d.dataset.beat = "1";
+      if (si % 4 === 0 && si !== 0) d.dataset.gap = "1";
+      leds.appendChild(d); els.colLeds.push(d);
+    }
+    scroll.insertBefore(leds, grid);
 
     const help = document.createElement("div");
     help.className = "seq-help";
@@ -238,7 +293,15 @@ MDS.ui.seq = (function () {
     const clear = document.createElement("button"); clear.textContent = C().seq.songClear; clear.dataset.tt = "songClear";
     clear.onclick = () => { S().project.song.length = 0; MDS.bus.emit("song"); };
     const len = document.createElement("span"); len.className = "seq-help"; els.songLen = len;
-    head.append(title, add, clear, len);
+    const hint = document.createElement("span");
+    hint.className = "seq-help is-right"; hint.textContent = C().seq.chipRemove;
+    const sCell = (...kids) => {
+      const d = document.createElement("div");
+      d.className = "hd-cell";
+      d.append(...kids);
+      return d;
+    };
+    head.append(sCell(title), sCell(add, clear), sCell(len), hint);
     const chain = document.createElement("div");
     chain.className = "chain"; chain.dataset.tt = "songChain";
     els.chain = chain;
@@ -257,7 +320,12 @@ MDS.ui.seq = (function () {
       const chip = document.createElement("span");
       chip.className = "chip"; chip.textContent = String(pIdx + 1);
       chip.title = C().seq.chipRemove;
-      chip.onclick = () => { song.splice(i, 1); MDS.bus.emit("song"); };
+      chip.onclick = (e) => {
+        // shift-click duplicates this slot in place; plain click removes it
+        if (e.shiftKey) song.splice(i + 1, 0, pIdx);
+        else song.splice(i, 1);
+        MDS.bus.emit("song");
+      };
       els.chain.appendChild(chip);
     });
     const secs = Math.round(song.length * 16 * MDS.seq.stepDur(S().project));
@@ -267,7 +335,7 @@ MDS.ui.seq = (function () {
   /* ── Playhead (rAF drains the engine's tick queue) ─────────────────── */
   function raf() {
     requestAnimationFrame(raf);
-    els.play.textContent = MDS.seq.playing ? C().transport.stop : C().transport.play;
+    els.playLabel.textContent = MDS.seq.playing ? C().transport.stop : C().transport.play;
     els.play.classList.toggle("is-playing", MDS.seq.playing);
     if (!MDS.seq.playing) {
       if (lastPlayCol >= 0) { clearPlayCol(); lastPlayCol = -1; }
@@ -287,6 +355,9 @@ MDS.ui.seq = (function () {
       for (let ti = 0; ti < 8; ti++) cells[ti][t.step].classList.add("is-play");
       lastPlayCol = t.step;
     }
+    if (els.colLeds) {
+      for (let si = 0; si < 16; si++) els.colLeds[si].classList.toggle("is-lit", si === t.step);
+    }
     for (let i = 0; i < 8; i++) els.bankBtns[i].classList.toggle("is-live", MDS.seq.playing && t.pIdx === i);
     // highlight current song chip
     if (S().playMode === "song") {
@@ -296,6 +367,7 @@ MDS.ui.seq = (function () {
   }
 
   function clearPlayCol() {
+    if (els.colLeds) els.colLeds.forEach((d) => d.classList.remove("is-lit"));
     if (lastPlayCol < 0) return;
     for (let ti = 0; ti < 8; ti++) cells[ti][lastPlayCol].classList.remove("is-play");
   }
@@ -311,9 +383,14 @@ MDS.ui.seq = (function () {
     MDS.bus.on("pattern", refreshGrid);
     MDS.bus.on("mix", refreshGrid);
     MDS.bus.on("song", refreshSong);
+    // keep the transport volume in step with the FX/MASTER fader
+    MDS.bus.on("master", () => {
+      if (els.masterVol) els.masterVol.set(S().project.master.vol, false);
+    });
     MDS.bus.on("project", () => {
       els.tempo.set(S().project.bpm, false);
       els.swing.set(S().project.swing, false);
+      if (els.masterVol) els.masterVol.set(S().project.master.vol, false);
       els.keySel.value = S().project.key;
       els.syncLock(); els.syncMode();
       refreshGrid(); refreshSong();

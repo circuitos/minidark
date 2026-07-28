@@ -178,16 +178,17 @@ MDS.ui.lessons = (function () {
     filter(box) {
       let osc = null, flt = null, gain = null;
       let cut = 800, res = 2;
-      const mkSlider = (label, min, max, val, onInput) => {
-        const wrap = document.createElement("label");
-        wrap.className = "tbgroup";
-        const l = document.createElement("span"); l.className = "k-label"; l.textContent = label;
-        const s = document.createElement("input");
-        s.type = "range"; s.min = min; s.max = max; s.value = val;
-        s.oninput = () => onInput(+s.value);
-        wrap.append(l, s);
-        box.appendChild(wrap);
-        return s;
+      /* Uses the app's own fader so the lesson control looks and behaves like
+         every other control (native range tracks render inconsistently and
+         nearly invisibly once appearance:none removes the platform track). */
+      const mkSlider = (label, min, max, val, onInput, fmt) => {
+        const f = MDS.ui.fader({
+          label: label, horizontal: true, min: min, max: max, value: val,
+          fmt: fmt || ((v) => Math.round(v) + ""),
+          onInput: onInput,
+        });
+        box.appendChild(f.el);
+        return f;
       };
       const hold = holdBtn(W().hold, () => {
         const a = S().ensureAudio();
@@ -207,11 +208,14 @@ MDS.ui.lessons = (function () {
       const cs = mkSlider(W().cutoff, 40, 100, 62, (v) => {
         cut = 40 * Math.pow(200, (v - 40) / 60); // log taper 40 Hz → 8 kHz
         if (flt) flt.frequency.setTargetAtTime(cut, S().audio.ctx.currentTime, 0.01);
+      }, (v) => {
+        const hz = 40 * Math.pow(200, (v - 40) / 60);
+        return hz >= 1000 ? (hz / 1000).toFixed(1) + "k" : Math.round(hz) + "";
       });
       mkSlider(W().reso, 0, 100, 15, (v) => {
         res = (v / 100) * 16;
         if (flt) flt.Q.setTargetAtTime(res, S().audio.ctx.currentTime, 0.01);
-      });
+      }, (v) => Math.round(v) + "%");
       const sweep = document.createElement("button");
       sweep.textContent = W().sweep;
       sweep.onclick = () => {
@@ -221,7 +225,7 @@ MDS.ui.lessons = (function () {
         flt.frequency.setValueAtTime(120, t);
         flt.frequency.exponentialRampToValueAtTime(8000, t + 2);
         flt.frequency.exponentialRampToValueAtTime(120, t + 4);
-        cs.value = 62;
+        cs.set(62, false);
       };
       box.appendChild(sweep);
     },

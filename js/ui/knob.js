@@ -96,6 +96,7 @@ MDS.ui.knob = function (opts) {
   let dragY = null, dragN = 0;
   el.addEventListener("pointerdown", (e) => {
     dragY = e.clientY; dragN = toNorm(value);
+    el.classList.add("is-active");
     el.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
@@ -104,8 +105,8 @@ MDS.ui.knob = function (opts) {
     const scale = e.shiftKey ? 900 : 160;
     set(fromNorm(dragN + (dragY - e.clientY) / scale));
   });
-  el.addEventListener("pointerup", () => { dragY = null; });
-  el.addEventListener("pointercancel", () => { dragY = null; });
+  el.addEventListener("pointerup", () => { dragY = null; el.classList.remove("is-active"); });
+  el.addEventListener("pointercancel", () => { dragY = null; el.classList.remove("is-active"); });
   el.addEventListener("dblclick", () => set(initial));
   el.addEventListener("wheel", (e) => {
     e.preventDefault();

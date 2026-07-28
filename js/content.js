@@ -35,6 +35,7 @@ MDS.CONTENT = {
     projName: "Project name",
     save: "SAVE",
     open: "OPEN",
+    reset: "RESET",
     export: "EXPORT",
     lessons: "LESSONS",
     glossary: "GLOSSARY",
@@ -54,7 +55,15 @@ MDS.CONTENT = {
     songClear: "CLEAR SONG",
     songEmpty: "Song is empty. Add patterns to build a track (30+ bars ≈ one minute).",
     songLen: (bars, secs) => `${bars} bars ≈ ${secs}s`,
-    chipRemove: "click to remove",
+    chipRemove: "click to remove, shift-click to duplicate",
+  },
+
+  confirm: {
+    resetTitle: "Reset project?",
+    resetBody: "This clears every pattern, the song chain and all sounds back to a blank project. Your current track is not saved anywhere, so use SAVE first if you want to keep it.",
+    resetCancel: "CANCEL",
+    resetOk: "RESET PROJECT",
+    resetDone: "Project reset to blank.",
   },
 
   tracks: {
@@ -69,7 +78,7 @@ MDS.CONTENT = {
     preset: "SOUND",
     gOsc: "OSCILLATORS", gFilter: "FILTER", gEnv: "ENVELOPE (ADSR)",
     gVoice: "VOICE", gFm: "FM", gDrum: "DRUM", gSends: "FX SENDS", gSample: "SAMPLE",
-    osc1: "OSC 1", osc2: "OSC 2", mix: "MIX", detune: "DETUNE", semi: "OSC2 PITCH",
+    osc1: "OSC 1", osc2: "OSC 2", mix: "MIX", detune: "DETUNE", semi: "O2 PITCH",
     glide: "GLIDE", cutoff: "CUTOFF", res: "RESO", envAmt: "ENV→FILT", fDec: "F.DECAY",
     a: "ATTACK", d: "DECAY", s: "SUSTAIN", r: "RELEASE",
     drive: "DRIVE", gain: "LEVEL",
@@ -94,6 +103,8 @@ MDS.CONTENT = {
     verbSize: "SIZE", verbTone: "TONE", verbLevel: "RETURN",
     crushBits: "BITS", crushLevel: "RETURN",
     mComp: "GLUE", mVol: "VOLUME",
+    meterTitle: "OUTPUT", meterL: "L", meterR: "R", meterGr: "GR", meterPeak: "PEAK", meterDb: "dB",
+    meterToggle: "VU",
     divisions: { "1/16": "1/16", "1/8": "1/8", "3/16": "3/16 (dotted)", "1/4": "1/4" },
   },
 
@@ -170,6 +181,7 @@ MDS.CONTENT = {
     projName: { what: "The name of your project, used for exported file names.", why: "Name it early; exported WAV/MP3 files inherit it." },
     save: { what: "Downloads your whole project as a small file you can re-open later.", why: "This studio keeps nothing between visits; the file IS your save game." },
     open: { what: "Loads a previously saved project file.", why: "Bring back yesterday's track and keep working." },
+    reset: { what: "Empties the whole project back to a blank track. Asks first.", why: "A clean slate is the fastest way to practice something new from scratch." },
     export: { what: "Renders your music to a real audio file (WAV/MP3).", why: "This is how a loop in a browser becomes a track you can share." },
     lessons: { what: "Interactive lessons that teach synthesis from zero, with live sound demos.", why: "Fifteen minutes here and every knob in this app will make sense." },
     glossary: { what: "Plain-language definitions of every technical word used in this app.", why: "Synth jargon is 50 years old and mostly historical accident. Look it up, don't memorize it." },
@@ -240,6 +252,7 @@ MDS.CONTENT = {
     crushLevel: { what: "How much crushed signal returns to the mix.", why: "Parallel grit: blend it under the clean mix for texture." },
     mComp: { what: "'Glue' compression on everything: it evens out peaks so the mix feels solid.", why: "Machine music wants a firm, even loudness; this also protects your ears and speakers." },
     mVol: { what: "Final output volume after compression and limiting.", why: "A limiter downstream stops clipping, so this is safe to push." },
+    meterVu: { what: "Live output meter: left and right level, plus GR, how hard the safety limiter is working.", why: "Healthy mixes dance in the green; constant red or heavy GR means turn voices down, not the master up." },
 
     sigNode: { what: "One stage of this voice's signal chain. Click to jump to its controls.", why: "Synthesis is plumbing: sound flows left to right; knowing the pipes is knowing the instrument." },
 
