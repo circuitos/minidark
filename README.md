@@ -23,7 +23,10 @@ touched a synthesizer.
 
 - **Synth engine** (Web Audio, everything synthesized, zero audio assets):
   subtractive voices (saw/pulse, resonant lowpass, ADSR), a 2-op FM voice,
-  and a full 808/909-style drum kit incl. two industrial hits.
+  and a full 808/909-style drum kit incl. industrial hits.
+- **40-sound library** with several presets per instrument family (six snares:
+  gated, 808, glitch, clap-snare, crack, dry), grouped so the family a track
+  already uses comes first in its SOUND picker.
 - **Effects**: waveshaper distortion, chorus, tempo-synced delay, convolution
   reverb with a procedurally generated impulse response, bitcrusher, plus a
   glue-compressed, limited master bus so beginners can't clip.

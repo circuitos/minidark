@@ -133,13 +133,19 @@ MDS.CONTENT = {
 
   /* Names for SOUND_LIBRARY entries (registry in js/library.js keeps ids only) */
   libNames: {
-    kick808: "Boom Kick", kick909: "Punch Kick", snare909: "Crack Snare",
-    snareTight: "Dry Snare", hatC: "Closed Hat", hatO: "Open Hat", clap909: "Clap",
-    grind: "Grinder Hit", clank: "Metal Clank",
-    bassNail: "Nailgun Bass", bassRubber: "Rubber Sub",
-    stabBrass: "Brass Stab", leadCold: "Cold Wire Lead", leadHollow: "Hollow Pulse",
-    padWarm: "Warm Ghost Pad", padGlass: "Glass Pad",
-    fmBell: "Ice Bell", fmTwang: "Wire Twang",
+    kick808: "Boom Kick", kick909: "Punch Kick", kickSub: "Sub Kick", kickRust: "Rust Kick",
+    snare909: "Crack Snare", snareTight: "Dry Snare", snareGate: "Gated Snare",
+    snare808: "808 Snare", snareGlitch: "Glitch Snare", snareClap: "Clap Snare",
+    hatC: "Closed Hat", hatO: "Open Hat", hatTick: "Tick Hat", hatSizzle: "Sizzle Hat",
+    clap909: "Clap", clapRoom: "Room Clap",
+    grind: "Grinder Hit", clank: "Metal Clank", anvil: "Anvil Hit", scrape: "Scrape",
+    bassNail: "Nailgun Bass", bassRubber: "Rubber Sub", bassAcid: "Acid Bass",
+    bassGrind: "Grinder Bass", bassPluck: "Pluck Bass",
+    stabBrass: "Brass Stab", stabDark: "Dark Stab", leadCold: "Cold Wire Lead",
+    leadHollow: "Hollow Pulse", leadNeon: "Neon Lead", leadBlade: "Blade Lead",
+    padWarm: "Warm Ghost Pad", padGlass: "Glass Pad", padDark: "Dark Pad",
+    padChoir: "Choir Pad", padSweep: "Sweep Pad",
+    fmBell: "Ice Bell", fmTwang: "Wire Twang", fmScrap: "Scrap Metal", fmWood: "Wood Block",
   },
 
   demos: {

@@ -112,16 +112,22 @@ MDS.ui.panels = (function () {
     presetWrap.className = "tbgroup"; presetWrap.dataset.tt = "preset";
     const pl = document.createElement("span"); pl.textContent = C().inst.preset;
     const sel = document.createElement("select");
-    const groups = {};
-    for (const e of MDS.lib.list()) {
-      if (!groups[e.category]) {
-        groups[e.category] = document.createElement("optgroup");
-        groups[e.category].label = C().lib.cats[e.category] || e.category;
-        sel.appendChild(groups[e.category]);
+    /* The whole library is here, but the family this track is already using
+       comes first: on a SNARE row you want the other snares, not to scroll. */
+    const cats = Object.keys(C().lib.cats);
+    const cur = MDS.lib.get(tr.soundId);
+    const order = cur ? [cur.category].concat(cats.filter((c) => c !== cur.category)) : cats;
+    for (const cat of order) {
+      const entries = MDS.lib.list(cat);
+      if (!entries.length) continue;
+      const grp = document.createElement("optgroup");
+      grp.label = C().lib.cats[cat] || cat;
+      for (const e of entries) {
+        const o = document.createElement("option");
+        o.value = e.id; o.textContent = C().libNames[e.id] || e.id;
+        grp.appendChild(o);
       }
-      const o = document.createElement("option");
-      o.value = e.id; o.textContent = C().libNames[e.id] || e.id;
-      groups[e.category].appendChild(o);
+      sel.appendChild(grp);
     }
     sel.value = tr.soundId;
     sel.onchange = () => { S().assignSound(ti, sel.value); };
