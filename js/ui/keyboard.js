@@ -40,7 +40,7 @@ MDS.ui.keyboard = (function () {
     const tr = S().project.tracks[ti];
     if (!tr.patch) return;
     held[n] = MDS.synth.noteOn(audio.graph, ti, tr.patch, n, 0.85);
-    S().sel.entryNote = n;
+    S().setEntryNote(ti, n);
     if (keyEls[n]) keyEls[n].classList.add("is-down");
   }
 

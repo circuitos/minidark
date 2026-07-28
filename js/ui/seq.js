@@ -232,17 +232,16 @@ MDS.ui.seq = (function () {
 
   function cellAt(ti, si) { return S().project.patterns[S().sel.pattern].steps[ti][si]; }
 
-  /* Pitch written into a step that has none yet. One rule, everywhere: the
-     last note you chose, whether you chose it on the keyboard or by wheeling
-     a step. sel.entryNote is that note; every path that picks a pitch sets it. */
-  function entryNote() {
-    return maybeSnap(S().sel.entryNote);
+  /* Pitch written into a step that has none yet: the last note chosen ON THAT
+     ROW, on the keyboard or with the wheel (state.js owns the rule). */
+  function entryNote(ti) {
+    return maybeSnap(S().entryNote(ti));
   }
 
   function toggleCell(ti, si) {
     const cell = cellAt(ti, si);
     cell.on = !cell.on;
-    if (cell.on && trackIsMelodic(ti) && cell.note == null) cell.note = entryNote();
+    if (cell.on && trackIsMelodic(ti) && cell.note == null) cell.note = entryNote(ti);
     MDS.bus.emit("pattern");
   }
 
@@ -259,7 +258,7 @@ MDS.ui.seq = (function () {
     const n = Math.max(1, Math.min(16 - si, len));
     if (!cell.on) {
       cell.on = true;
-      if (cell.note == null) cell.note = entryNote();
+      if (cell.note == null) cell.note = entryNote(ti);
     }
     cell.len = n;
     MDS.bus.emit("pattern");
@@ -321,7 +320,7 @@ MDS.ui.seq = (function () {
     cell.note = Math.max(21, Math.min(108, n));
     if (cell.notes) delete cell.notes; // editing the root dissolves authored chords
     // Wheeling a step IS choosing a note: the next step you write gets it too.
-    S().sel.entryNote = cell.note;
+    S().setEntryNote(ti, cell.note);
     MDS.bus.emit("pattern");
     MDS.bus.emit("sel");
   }

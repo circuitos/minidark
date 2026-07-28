@@ -82,8 +82,12 @@ MDS.state = (function () {
     sel: {
       track: 4,          // start on BASS — the genre's front door
       pattern: 0,
-      entryNote: 45,     // LAST CHOSEN NOTE: written into new melodic steps.
-                         // Set by the keyboard and by wheeling a step (A2 to start)
+      // LAST CHOSEN NOTE, PER TRACK: the note new melodic steps on that row
+      // get. Written by the keyboard and by wheeling a step. Sparse on
+      // purpose: a row nobody has chosen on yet follows its sound's own base
+      // note, so a fresh pad row starts in pad register, not wherever the
+      // bass was. See state.entryNote()/setEntryNote() below.
+      entryNotes: {},
       octave: 0,         // keyboard octave shift
     },
     clipboard: null,     // copied pattern
@@ -100,6 +104,21 @@ MDS.state = (function () {
     }
     if (state.audio.ctx.state === "suspended") state.audio.ctx.resume();
     return state.audio;
+  };
+
+  /* ── Note entry ────────────────────────────────────────────────────────
+     One owner for "which note does a new step get". Every path that lets the
+     user pick a pitch (keyboard, wheel) calls setEntryNote; every path that
+     writes a step calls entryNote. Keep it that way or the rows quietly stop
+     remembering. */
+  state.entryNote = function (trackIdx) {
+    const chosen = state.sel.entryNotes[trackIdx];
+    if (chosen != null) return chosen;
+    const tr = state.project.tracks[trackIdx];
+    return tr ? tr.baseNote : 60;
+  };
+  state.setEntryNote = function (trackIdx, note) {
+    state.sel.entryNotes[trackIdx] = note;
   };
 
   state.applyAudio = function () {
@@ -219,8 +238,10 @@ MDS.state = (function () {
     while (proj.patterns.length < 8) proj.patterns.push(emptyPattern());
     state.project = proj;
     // keepView: an undo step restores the music, not where you were looking
+    // (and not the notes you had chosen per row, which outlive the edit)
     if (!opts || !opts.keepView) {
       state.sel.pattern = 0;
+      state.sel.entryNotes = {};   // different song, different instruments
       state.playMode = proj.song.length ? "song" : "pattern";
     }
     state.applyAudio();
