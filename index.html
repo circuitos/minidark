@@ -20,6 +20,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- CSP (meta form; GitHub Pages can't set HTTP headers). script-src allows
+       only self + cdnjs (lamejs); connect-src 'self' so injected code can't
+       phone home. No inline scripts/styles anywhere, so no 'unsafe-inline'. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>MINIDARK — a tiny dark-synth studio</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230d0e11'/%3E%3Ccircle cx='8' cy='8' r='4' fill='none' stroke='%23e0483c' stroke-width='2'/%3E%3Cline x1='8' y1='8' x2='11' y2='5' stroke='%23e8eaef' stroke-width='1.5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/theme.css">
@@ -28,21 +32,8 @@
 <body>
   <div id="app" class="app"></div>
 
-  <script>
-    /* MP3 encoder (lamejs) from cdnjs — the ONLY external dependency, and an
-       optional one: export degrades gracefully to WAV-only with a visible
-       notice if this fails to load (see js/ui/exportui.js).
-       Path verified against the lamejs 1.2.0 npm package (same file cdnjs
-       mirrors); cdnjs itself was unreachable from the build environment's
-       network, so the runtime onload/onerror handling below is load-bearing. */
-    window.MDS = window.MDS || {};
-    MDS.LAME_STATE = "loading";
-  </script>
-  <script async
-    src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js"
-    onload="MDS.LAME_STATE='ok'"
-    onerror="MDS.LAME_STATE='failed'"></script>
-
+  <!-- BOOT (namespace + lamejs loader; kept in a file for the CSP) -->
+  <script src="js/boot.js"></script>
   <!-- CONTENT -->
   <script src="js/content.js"></script>
   <!-- ENGINE -->

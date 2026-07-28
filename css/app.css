@@ -265,7 +265,7 @@ h3 { font-size: var(--fs-m); color: var(--c-ink1); text-transform: uppercase; le
 /* ── Modals (lessons, glossary, export) ───────────────────────────────── */
 .modal-back {
   position: fixed; inset: 0; z-index: 50;
-  background: rgba(0, 0, 0, 0.65);
+  background: var(--c-scrim);
   display: flex; align-items: center; justify-content: center; padding: var(--sp-4);
 }
 .modal {

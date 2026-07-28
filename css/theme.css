@@ -33,6 +33,7 @@
   --c-warn: #d8a13c;         /* warnings / notices        */
   --c-black: #000000;        /* shadow base only          */
   --c-white: #ffffff;        /* highlight base only       */
+  --c-scrim: rgba(0, 0, 0, 0.65);  /* modal backdrop      */
 
   /* 2 ── Track identity hues (row LEDs, playhead tint, mixer strips) */
   --track-0: #d9543f;  /* kick  */
