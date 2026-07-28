@@ -1,0 +1,30 @@
+# Non-blocking CI gate, deliberately SEPARATE from deploy-pages so a red gate
+# never blocks a live WIP preview. The red X on the commit is the signal.
+# Zero-dependency Node scripts: no npm install.
+name: checks
+
+on:
+  push:
+    branches-ignore: [gh-pages]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # cheapest → dearest; each fails the job on non-zero exit
+      - name: Validate (content, library, demos, tooltip wiring)
+        run: node scripts/validate.mjs
+      - name: Lint (syntax, duplicate globals, theme/copy house rules)
+        run: node scripts/lint.mjs
+      - name: Smoke (headless run of sequencer scheduling + WAV encoder)
+        run: node scripts/smoke.mjs

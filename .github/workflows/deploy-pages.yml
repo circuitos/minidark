@@ -1,0 +1,73 @@
+# Composes the whole site (trunk at root + every branch under /previews/) and
+# force-pushes it to gh-pages. One-time setup: Settings → Pages → Source:
+# "Deploy from a branch" → gh-pages / root.
+# If this workflow fails, the site silently goes stale: watch the Actions tab.
+name: deploy-pages
+
+on:
+  push:
+    branches-ignore: [gh-pages]
+  delete:
+  workflow_dispatch:
+
+# Safe to cancel in-progress runs: the final force-push is atomic.
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # deletes of tags shouldn't redeploy; branch deletes should (drops the preview)
+    if: github.event_name != 'delete' || github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compose site
+        run: node scripts/build-preview-site.mjs _site
+        env:
+          ROOT_BRANCH: ${{ github.event.repository.default_branch }}
+      - name: Push to gh-pages
+        run: |
+          cd _site
+          git init -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "deploy ${{ github.sha }}"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
+
+  # Sticky preview-URL comment on the branch's open PR (if any). One comment,
+  # found by a hidden marker and updated in place.
+  pr-comment:
+    if: github.event_name == 'push'
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const defaultBranch = context.payload.repository.default_branch;
+            const [owner, repo] = [context.repo.owner, context.repo.repo];
+            const base = `https://${owner}.github.io/${repo}`;
+            // slug rule must match scripts/build-preview-site.mjs
+            const slug = branch.replace(/\//g, '--').replace(/[^A-Za-z0-9._-]/g, '-');
+            const url = branch === defaultBranch ? `${base}/` : `${base}/previews/${slug}/`;
+            const marker = '<!-- deploy-pages preview url -->';
+            const body = `${marker}\nLive preview for \`${branch}\`: ${url}\n\n(Redeploys on every push; allow ~1 min plus up to 10 min of Pages edge cache.)`;
+            const prs = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${branch}` });
+            for (const pr of prs.data) {
+              const comments = await github.rest.issues.listComments({ owner, repo, issue_number: pr.number, per_page: 100 });
+              const mine = comments.data.find(c => c.body && c.body.includes(marker));
+              if (mine) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+              }
+            }
