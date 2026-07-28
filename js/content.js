@@ -76,6 +76,7 @@ MDS.CONTENT = {
   inst: {
     sigTitle: "SIGNAL PATH: click a box to jump to its controls",
     preset: "SOUND",
+    random: "RANDOMIZE",
     gOsc: "OSCILLATORS", gFilter: "FILTER", gEnv: "ENVELOPE (ADSR)",
     gVoice: "VOICE", gFm: "FM", gDrum: "DRUM", gSends: "FX SENDS", gSample: "SAMPLE",
     osc1: "OSC 1", osc2: "OSC 2", mix: "MIX", detune: "DETUNE", semi: "O2 PITCH",
@@ -201,6 +202,7 @@ MDS.CONTENT = {
     kbdOct: { what: "Shifts the on-screen keyboard up or down one octave.", why: "Basses live low, leads live high. Same keys, different neighborhood." },
 
     preset: { what: "Loads a ready-made sound from the library onto this track.", why: "Presets are how you learn: load one, look at what the knobs are doing, break it." },
+    random: { what: "Throws every dial on this instrument to a new random setting and plays it once. The kind of instrument stays the same: a kick stays a kick.", why: "Chaos teaches faster than theory. Roll it until something surprises you, then look at which knobs got you there. Undo brings back what you had." },
     osc1: { what: "The waveform of oscillator 1, the raw tone before any shaping.", why: "Saw = bright and angry, pulse = hollow and cold: the two flavors this genre runs on." },
     osc2: { what: "A second oscillator layered with the first.", why: "Two slightly different oscillators beat against each other: instant thickness." },
     mix: { what: "Balance between oscillator 1 and oscillator 2.", why: "Blend a low square under a saw for weight, or pure saw for cut." },

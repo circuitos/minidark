@@ -126,7 +126,19 @@ MDS.ui.panels = (function () {
     sel.value = tr.soundId;
     sel.onchange = () => { S().assignSound(ti, sel.value); };
     presetWrap.append(pl, sel);
-    bodyEl.appendChild(presetWrap);
+
+    /* Roll the dials and play the result: learning by wreckage. */
+    const roll = document.createElement("button");
+    roll.textContent = C().inst.random; roll.dataset.tt = "random";
+    roll.onclick = () => {
+      const audio = S().ensureAudio();
+      const patch = S().randomizePatch(ti);
+      if (patch) MDS.synth.preview(audio.graph, patch, tr.baseNote);
+    };
+    const head = document.createElement("div");
+    head.className = "inst-head";
+    head.append(presetWrap, roll);
+    bodyEl.appendChild(head);
 
     const eng = tr.patch ? tr.patch.engine : null;
     if (eng === "sub") {

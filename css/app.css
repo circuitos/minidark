@@ -157,6 +157,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 .topbar .grow { flex: 1; }
 .topbar .proj-name { width: 11rem; }
 .tbgroup { display: flex; align-items: center; gap: var(--sp-2); }
+/* Sound picker and its RANDOMIZE button share one line above the dials. */
+.inst-head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.inst-head .tbgroup { flex: 1 1 auto; min-width: 0; }
+.inst-head .tbgroup select { flex: 1 1 auto; min-width: 0; }
 
 .main {
   flex: 1; display: flex; gap: var(--sp-3);

@@ -121,6 +121,77 @@ MDS.state = (function () {
     MDS.bus.emit("patch");
   };
 
+  /* ── Randomizer ───────────────────────────────────────────────────────
+     Rolls a new patch for a track, in place. The ranges below are wider than
+     the library's own taste (very dark or very bright filters, slow attacks,
+     inharmonic FM ratios, hard drive) so a roll can genuinely surprise, but
+     they stay inside what the voice can render: gain never reaches zero or
+     clipping territory, and engine/kind are never rewritten, so a KICK row
+     stays a kick. Deliberately DOM-free: the check scripts roll it headlessly. */
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const rndExp = (a, b) => a * Math.pow(b / a, Math.random());
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const chance = (p) => Math.random() < p;
+
+  // Repeats are the weighting: the house sound is saws and pulses.
+  const WAVES = ["sawtooth", "sawtooth", "sawtooth", "pulse", "pulse", "square", "triangle", "sine"];
+  const SEMIS = [-24, -12, -12, -12, -7, -5, 0, 0, 0, 7, 12, 12, 19];
+  const RATIOS = [0.5, 1, 1.5, 2, 2.01, 2.5, 3, 3.5, 4, 5, 5.43, 7, 9, 11];
+
+  function rollPatch(patch) {
+    if (!patch) return patch;
+    switch (patch.engine) {
+      case "sub":
+        patch.osc1 = pick(WAVES); patch.osc2 = pick(WAVES);
+        patch.semi = pick(SEMIS);
+        patch.detune = rnd(0, 28);
+        patch.mix = rnd(0.15, 0.85);
+        patch.glide = chance(0.7) ? 0 : rnd(0.01, 0.18);
+        patch.cutoff = rndExp(120, 9000);
+        patch.res = rnd(0.3, 15);
+        patch.envAmt = rnd(0, 5200);
+        patch.fDec = rndExp(0.03, 1.4);
+        patch.a = rndExp(0.002, 1.1);
+        patch.d = rndExp(0.04, 1.4);
+        patch.s = rnd(0, 0.9);
+        patch.r = rndExp(0.02, 1.6);
+        patch.drive = chance(0.35) ? 0 : rnd(0.05, 0.85);
+        patch.gain = rnd(0.35, 0.85);
+        break;
+      case "fm":
+        patch.ratio = pick(RATIOS);
+        patch.index = rnd(0.3, 11);
+        patch.iDec = rndExp(0.04, 1.2);
+        patch.a = rndExp(0.002, 0.9);
+        patch.d = rndExp(0.04, 1.4);
+        patch.s = rnd(0, 0.85);
+        patch.r = rndExp(0.02, 1.4);
+        patch.gain = rnd(0.4, 0.8);
+        break;
+      case "drum":
+        patch.dTune = rnd(0.55, 1.9);
+        patch.dDecay = rnd(0.05, 1);
+        patch.dTone = rnd(0, 1);
+        patch.dDrive = chance(0.3) ? 0 : rnd(0.05, 0.9);
+        patch.gain = rnd(0.6, 1.05);
+        break;
+      case "buffer":
+        patch.dTune = rnd(0.6, 1.6);
+        patch.gain = rnd(0.6, 1);
+        break;
+    }
+    return patch;
+  }
+
+  /* Roll the patch on one track. Returns it so the UI can audition the result. */
+  state.randomizePatch = function (trackIdx) {
+    const tr = state.project.tracks[trackIdx];
+    if (!tr || !tr.patch) return null;
+    rollPatch(tr.patch);
+    MDS.bus.emit("patch");
+    return tr.patch;
+  };
+
   /* ── Persistence (file-based; see EXPORT dialog) ── */
   state.toJSON = function () {
     return JSON.stringify({ v: 1, project: state.project }, null, 1);
@@ -157,5 +228,6 @@ MDS.state = (function () {
   state.TRACK_DEFS = TRACK_DEFS;
   state.emptyPattern = emptyPattern;
   state.defaultProject = defaultProject;
+  state.rollPatch = rollPatch;   // exposed for the check scripts
   return state;
 })();

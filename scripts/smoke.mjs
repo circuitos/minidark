@@ -77,6 +77,32 @@ for (const id of MDS.demos.ids()) {
   ok("sequencer: cell.len scales note duration (a held pad outlasts its attack)");
 }
 
+/* ── randomizer stays inside what the voices can render ────────────────── */
+{
+  let rolls = 0, changed = 0;
+  for (const e of MDS.SOUND_LIBRARY) {
+    const base = MDS.lib.materialize(e.id);
+    if (!base || base.engine === "buffer") continue;
+    for (let i = 0; i < 200; i++) {
+      const before = JSON.stringify(base);
+      const p = MDS.state.rollPatch(JSON.parse(before));
+      rolls++;
+      if (JSON.stringify(p) !== before) changed++;
+      assert(p.engine === base.engine, `roll changed the engine of "${e.id}"`);
+      if (base.kind) assert(p.kind === base.kind, `roll changed the drum kind of "${e.id}"`);
+      for (const [k, v] of Object.entries(p)) {
+        if (typeof v !== "number") continue;
+        assert(Number.isFinite(v) && v >= -24 && v <= 12000, `roll of "${e.id}" gave ${k} = ${v}`);
+      }
+      // never silent, never slammed into the limiter
+      assert(p.gain > 0.3 && p.gain <= 1.1, `roll of "${e.id}" gave gain ${p.gain}`);
+      if (p.a != null) assert(p.a > 0 && p.a <= 1.2, `roll of "${e.id}" gave attack ${p.a}s`);
+    }
+  }
+  assert(changed / rolls > 0.99, `only ${changed} of ${rolls} rolls changed the patch`);
+  ok(`randomizer: ${rolls} rolls stay in range, engine and drum kind preserved`);
+}
+
 /* ── WAV encoder against a fake AudioBuffer ────────────────────────────── */
 const N = 44100;
 const chan = new Float32Array(N);
