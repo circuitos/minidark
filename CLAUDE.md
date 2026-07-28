@@ -92,6 +92,11 @@ Run all three check scripts before declaring any change done.
   `linearRampToValueAtTime` that has not landed yet reverts the param to the
   ramp's START value, so before this every note shorter than its own attack
   rendered as exact digital silence, live and in export alike.
+- `sel.entryNote` is the one "last chosen note": the on-screen/QWERTY keyboard
+  (`keyboard.js`) and the wheel-nudge (`seq.js`) both write it, and every new
+  melodic step reads it, on ANY row, selected or not. Selecting a track must
+  not overwrite it. Add a third way to pick a pitch and it has to set
+  `entryNote` too, or the rule silently stops holding.
 - Undo entries are whole-project JSON snapshots pushed at gesture END:
   `main.js` marks on bubbling `click`/`change`/`keyup` (after the handler that
   edited), plus a delayed `pointerup` for drags and for handlers that stop

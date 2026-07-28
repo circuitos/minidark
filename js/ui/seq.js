@@ -179,8 +179,10 @@ MDS.ui.seq = (function () {
       solo.onclick = (e) => { e.stopPropagation(); const t = S().project.tracks[ti]; t.solo = !t.solo; S().applyMixer(); MDS.bus.emit("mix"); };
       rh.append(led, nm, mute, solo);
       rh.onclick = () => {
+        // Selecting a row moves the keyboard and the panel, NOT the note you
+        // last chose: picking the row you want to write on must not silently
+        // throw that choice away.
         S().sel.track = ti;
-        S().sel.entryNote = S().project.tracks[ti].baseNote;
         MDS.bus.emit("sel");
       };
       els.rowHeads.push({ rh, mute, solo });
@@ -230,17 +232,17 @@ MDS.ui.seq = (function () {
 
   function cellAt(ti, si) { return S().project.patterns[S().sel.pattern].steps[ti][si]; }
 
-  /* Pitch written into a step that has none yet: the keyboard's last note for
-     the selected track, the track's own base note otherwise. */
-  function entryNote(ti) {
-    const raw = ti === S().sel.track ? S().sel.entryNote : S().project.tracks[ti].baseNote;
-    return maybeSnap(raw);
+  /* Pitch written into a step that has none yet. One rule, everywhere: the
+     last note you chose, whether you chose it on the keyboard or by wheeling
+     a step. sel.entryNote is that note; every path that picks a pitch sets it. */
+  function entryNote() {
+    return maybeSnap(S().sel.entryNote);
   }
 
   function toggleCell(ti, si) {
     const cell = cellAt(ti, si);
     cell.on = !cell.on;
-    if (cell.on && trackIsMelodic(ti) && cell.note == null) cell.note = entryNote(ti);
+    if (cell.on && trackIsMelodic(ti) && cell.note == null) cell.note = entryNote();
     MDS.bus.emit("pattern");
   }
 
@@ -257,7 +259,7 @@ MDS.ui.seq = (function () {
     const n = Math.max(1, Math.min(16 - si, len));
     if (!cell.on) {
       cell.on = true;
-      if (cell.note == null) cell.note = entryNote(ti);
+      if (cell.note == null) cell.note = entryNote();
     }
     cell.len = n;
     MDS.bus.emit("pattern");
@@ -318,7 +320,10 @@ MDS.ui.seq = (function () {
     }
     cell.note = Math.max(21, Math.min(108, n));
     if (cell.notes) delete cell.notes; // editing the root dissolves authored chords
+    // Wheeling a step IS choosing a note: the next step you write gets it too.
+    S().sel.entryNote = cell.note;
     MDS.bus.emit("pattern");
+    MDS.bus.emit("sel");
   }
 
   function maybeSnap(n) {

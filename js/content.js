@@ -51,7 +51,7 @@ MDS.CONTENT = {
     copy: "COPY",
     paste: "PASTE",
     clear: "CLEAR",
-    help: "click: step on/off · drag right on a melody step: hold the note over several steps (slow pads need this) · shift-click: hold one step longer · right-click: accent · mouse-wheel on a step: change note (melody rows) · the keyboard below sets the note used for new steps",
+    help: "click: step on/off · drag right on a melody step: hold the note over several steps (slow pads need this) · shift-click: hold one step longer · right-click: accent · mouse-wheel on a step: change note (melody rows) · new steps take the last note you chose, on the keyboard or with the wheel",
     songTitle: "SONG: chain patterns into a full track",
     songAdd: "+ ADD PATTERN",
     songClear: "CLEAR SONG",

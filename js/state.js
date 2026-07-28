@@ -82,7 +82,8 @@ MDS.state = (function () {
     sel: {
       track: 4,          // start on BASS — the genre's front door
       pattern: 0,
-      entryNote: 45,     // note written into new melodic steps (A2)
+      entryNote: 45,     // LAST CHOSEN NOTE: written into new melodic steps.
+                         // Set by the keyboard and by wheeling a step (A2 to start)
       octave: 0,         // keyboard octave shift
     },
     clipboard: null,     // copied pattern
