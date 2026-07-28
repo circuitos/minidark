@@ -28,10 +28,12 @@ touched a synthesizer.
   reverb with a procedurally generated impulse response, bitcrusher, plus a
   glue-compressed, limited master bus so beginners can't clip.
 - **16-step sequencer**, 8 tracks, accents, note lengths (drag a melody step
-  right to hold it), 8-pattern bank, song mode
+  right to hold it), 8-pattern bank, undo/redo, song mode
   (chains 30+ bars), scale lock, swing, lookahead scheduling on the audio
   clock (no drift).
 - **Playable keyboard** (mouse/touch + QWERTY) over the running sequencer.
+- **RANDOMIZE** on every instrument: rerolls each dial inside ranges the voice
+  can still render, plays the result, and stays one undo away.
 - **Learning layer**: 7 interactive lessons with live sound demos, tooltips
   on every control, a 55-term glossary, and three original, fully editable
   demo tracks (brooding / mid-tempo / aggressive).

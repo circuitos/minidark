@@ -27,6 +27,19 @@
 
     const grow = el("span", "grow");
 
+    /* History pair: greyed out when there is nothing left in that direction,
+       so the buttons also say how much room you have to experiment. */
+    const undo = el("button", null, C().transport.undo); undo.dataset.tt = "undo";
+    const redo = el("button", null, C().transport.redo); redo.dataset.tt = "redo";
+    undo.onclick = () => MDS.history.undo();
+    redo.onclick = () => MDS.history.redo();
+    const syncHistory = () => {
+      undo.disabled = !MDS.history.canUndo;
+      redo.disabled = !MDS.history.canRedo;
+    };
+    MDS.bus.on("history", syncHistory);
+    syncHistory();
+
     const save = el("button", null, C().transport.save); save.dataset.tt = "save";
     save.onclick = () => {
       const blob = new Blob([S().toJSON()], { type: "application/json" });
@@ -63,7 +76,7 @@
     const glo = el("button", null, C().transport.glossary); glo.dataset.tt = "glossary";
     glo.onclick = () => MDS.ui.glossary.open();
 
-    bar.append(logo, sub, nameIn, grow, save, openBtn, fileIn, reset, exp, les, glo);
+    bar.append(logo, sub, nameIn, grow, undo, redo, save, openBtn, fileIn, reset, exp, les, glo);
   }
 
   function confirmReset() {
@@ -150,6 +163,31 @@
       S().ensureAudio();
       MDS.seq.toggle();
     });
+
+    /* Undo/redo. Inside a text field the browser's own undo wins, which is
+       what a typist expects while renaming the project. */
+    document.addEventListener("keydown", (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+      const k = e.key.toLowerCase();
+      if (k === "z") { e.preventDefault(); if (e.shiftKey) MDS.history.redo(); else MDS.history.undo(); }
+      else if (k === "y") { e.preventDefault(); MDS.history.redo(); }
+    });
+
+    /* One entry per gesture: snapshot after the interaction that changed
+       something, never during it, so a knob drag is a single undo step while
+       three quick step clicks stay three. Clicks/changes/keys mark on the way
+       back up, after the handler that did the editing has run; drags have no
+       click to ride on, so pointerup marks on a short delay. A gesture that
+       stops propagation (the mute/solo minis) is caught by the pointerup path.
+       mark() diffs the project itself, so extra calls collapse to nothing. */
+    const markNow = () => MDS.history.mark();
+    for (const ev of ["click", "change", "keyup"]) document.addEventListener(ev, markNow);
+    for (const ev of ["pointerup", "pointercancel"]) {
+      document.addEventListener(ev, () => setTimeout(markNow, 60), true);
+    }
+    MDS.bus.on("project", () => setTimeout(markNow, 0));  // demo load, OPEN, RESET
+    MDS.history.reset();                                  // the loaded demo is entry zero
 
     buildPowerOverlay(() => {
       S().ensureAudio();      // resume inside the click gesture

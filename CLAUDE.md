@@ -15,7 +15,7 @@ One owner per fact; link, don't restate.
 | User-facing strings (labels, lessons, tooltips, glossary, preset names) | `js/content.js` | UI reads keys, never inline strings. |
 | Audio graph, voices, clock, export | `js/engine/*` | No DOM, no user-facing strings, no styles. This rule is what lets CI run the engine headlessly in Node. |
 | Sound registry | `js/library.js` | Pure data + loader; schema documented in-file. Grow by appending entries. |
-| Project state, event bus | `js/state.js` | In-memory only; persistence is file export by design. |
+| Project state, event bus | `js/state.js` | In-memory only; persistence is file export by design. Also owns the patch randomizer and the undo/redo snapshot stack, both DOM-free so the check scripts can drive them. |
 | Demo tracks | `js/demos.js` | Original compositions as data. Blurbs/names live in CONTENT. |
 | UI components | `js/ui/*` | Wire ENGINE state to controls. Tokens + CONTENT keys only. |
 | Self-hosted fonts (Barlow, IBM Plex Mono + OFL licenses) | `fonts/`, `@font-face` in `css/theme.css` | CSP is `font-src 'self'`: no CDN webfonts, ever. |
@@ -92,6 +92,14 @@ Run all three check scripts before declaring any change done.
   `linearRampToValueAtTime` that has not landed yet reverts the param to the
   ramp's START value, so before this every note shorter than its own attack
   rendered as exact digital silence, live and in export alike.
+- Undo entries are whole-project JSON snapshots pushed at gesture END:
+  `main.js` marks on bubbling `click`/`change`/`keyup` (after the handler that
+  edited), plus a delayed `pointerup` for drags and for handlers that stop
+  propagation. `mark()` diffs before pushing, so calling it too often is free.
+  `history.apply()` sets its `last` snapshot BEFORE restoring, which is what
+  stops the `project` event it fires from pushing the undone state back on.
+- `keyboard.js` ignores keydowns carrying Ctrl/Cmd/Alt: `z`, `x` and `c` are
+  note keys, so without that guard Ctrl+Z would play a note while undoing.
 - `sendDist`/`sendChor`/`sendDelay`/`sendVerb`/`sendCrush` tooltip keys are
   built by string concatenation in `js/ui/panels.js`; `validate.mjs` hardcodes
   that list. Change one, change both.

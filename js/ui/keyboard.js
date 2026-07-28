@@ -90,6 +90,8 @@ MDS.ui.keyboard = (function () {
     document.addEventListener("keydown", (e) => {
       if (e.repeat) return;
       if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+      // shortcuts own the modified keys: Ctrl+Z is undo, not the Z note
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const off = QWERTY[e.key.toLowerCase()];
       if (off != null) { noteOn(playedNote(off)); }
     });

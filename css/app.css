@@ -46,6 +46,12 @@ button {
 }
 button:hover { background: var(--c-bg3); color: var(--c-ink0); }
 button:active { transform: translateY(1px); }
+/* A control with nothing to do (UNDO at the start of a session) stays in
+   place and dims, rather than disappearing and moving its neighbours. */
+button:disabled, button:disabled:hover {
+  color: var(--c-ink2); border-color: var(--c-hair);
+  background: var(--c-bg1); opacity: 0.55; cursor: default; transform: none;
+}
 /* Small controls sitting ON a raised surface get an inset dark well, so they
    read against their container instead of matching it (like the step pads). */
 .row-head .mini, .strip .ms button, .chip {

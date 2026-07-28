@@ -205,7 +205,7 @@ MDS.state = (function () {
 
   /* Replace the project (from file or demo). Rebuilds patches defensively so
      old/foreign files can't inject broken shapes silently. */
-  state.loadProject = function (p) {
+  state.loadProject = function (p, opts) {
     const base = defaultProject();
     const proj = Object.assign(base, p);
     proj.tracks = base.tracks.map((bt, i) => {
@@ -217,8 +217,11 @@ MDS.state = (function () {
     });
     while (proj.patterns.length < 8) proj.patterns.push(emptyPattern());
     state.project = proj;
-    state.sel.pattern = 0;
-    state.playMode = proj.song.length ? "song" : "pattern";
+    // keepView: an undo step restores the music, not where you were looking
+    if (!opts || !opts.keepView) {
+      state.sel.pattern = 0;
+      state.playMode = proj.song.length ? "song" : "pattern";
+    }
     state.applyAudio();
     MDS.bus.emit("project");
   };
@@ -230,4 +233,57 @@ MDS.state = (function () {
   state.defaultProject = defaultProject;
   state.rollPatch = rollPatch;   // exposed for the check scripts
   return state;
+})();
+
+/* ============================================================================
+   UNDO / REDO. Entries are whole-project JSON snapshots: the project is a few
+   tens of KB, and copying all of it sidesteps the classic undo bug where a
+   half-recorded edit restores into a state it was never taken from.
+   mark() is a no-op when nothing actually changed, so the UI can fire it after
+   any gesture without deciding first whether that gesture was an edit.
+   No DOM here: the triggers (buttons, hotkeys, gesture ends) live in main.js.
+   ========================================================================== */
+MDS.history = (function () {
+  "use strict";
+  const LIMIT = 60;          // entries; the oldest edits fall off the bottom
+  let stack = [], idx = -1, last = "";
+
+  function view() {
+    return { pattern: MDS.state.sel.pattern, track: MDS.state.sel.track };
+  }
+
+  /* Record the current project as a new entry. Returns true if it was one. */
+  function mark() {
+    const json = JSON.stringify(MDS.state.project);
+    if (json === last) return false;
+    stack = stack.slice(0, idx + 1);      // a fresh edit drops the redo tail
+    stack.push({ json, sel: view() });
+    if (stack.length > LIMIT) stack.shift();
+    idx = stack.length - 1;
+    last = json;
+    MDS.bus.emit("history");
+    return true;
+  }
+
+  /* Restoring emits "project", which the UI answers with a mark(); setting
+     `last` first is what makes that mark a no-op instead of a new entry. */
+  function apply(entry) {
+    last = entry.json;
+    MDS.state.loadProject(JSON.parse(entry.json), { keepView: true });
+    MDS.state.sel.pattern = entry.sel.pattern;
+    MDS.state.sel.track = entry.sel.track;
+    MDS.bus.emit("sel");
+    MDS.bus.emit("history");
+  }
+
+  function undo() { if (idx <= 0) return false; apply(stack[--idx]); return true; }
+  function redo() { if (idx >= stack.length - 1) return false; apply(stack[++idx]); return true; }
+  function reset() { stack = []; idx = -1; last = ""; mark(); }
+
+  return {
+    mark, undo, redo, reset,
+    get canUndo() { return idx > 0; },
+    get canRedo() { return idx < stack.length - 1; },
+    get depth() { return stack.length; },
+  };
 })();
