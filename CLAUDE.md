@@ -15,7 +15,7 @@ One owner per fact; link, don't restate.
 | User-facing strings (labels, lessons, tooltips, glossary, preset names) | `js/content.js` | UI reads keys, never inline strings. |
 | Audio graph, voices, clock, export | `js/engine/*` | No DOM, no user-facing strings, no styles. This rule is what lets CI run the engine headlessly in Node. |
 | Sound registry | `js/library.js` | Pure data + loader; schema documented in-file. Grow by appending entries. |
-| Project state, event bus | `js/state.js` | In-memory only; persistence is file export by design. Also owns the patch randomizer and the undo/redo snapshot stack, both DOM-free so the check scripts can drive them. |
+| Project state, event bus | `js/state.js` | In-memory only; persistence is file export by design. Also owns the patch randomizer, the undo/redo snapshot stack, and the imported-sample store, all DOM-free so the check scripts can drive them. |
 | Demo tracks | `js/demos.js` | Original compositions as data. Blurbs/names live in CONTENT. |
 | UI components | `js/ui/*` | Wire ENGINE state to controls. Tokens + CONTENT keys only. |
 | Self-hosted fonts (Barlow, IBM Plex Mono + OFL licenses) | `fonts/`, `@font-face` in `css/theme.css` | CSP is `font-src 'self'`: no CDN webfonts, ever. |
@@ -117,6 +117,25 @@ Run all three check scripts before declaring any change done.
   layer, not ENGINE.
 - The app intentionally has a single dark theme (it's a dark-synth studio);
   a `prefers-color-scheme` light variant is a design-pass decision, not a bug.
+- Imported samples live in `state.samples`, deliberately OUTSIDE `project`:
+  undo stringifies the whole project after every gesture, so base64 audio in
+  `project` would bloat every snapshot and slow every `mark()` diff. Samples
+  persist only through SAVE (`toJSON` writes a top-level `samples` key), and
+  undo never un-imports one. An `AudioBuffer` does not survive JSON either;
+  `loadProject` re-materializes `engine:"buffer"` patches from the decode
+  cache and `hydrateBuffers()` refills them async when audio exists.
+- Adding a library entry takes three CONTENT pieces: `libNames`, and a
+  `libInfo` lore entry (text + https link + glossary term refs). `validate.mjs`
+  fails on a missing piece, a non-https link, or a term that is not an exact
+  glossary term name.
+- Guitars are Karplus-Strong: `dsp.karplus` is pure math with a fixed-seed
+  PRNG (smoke.mjs runs it in Node; keep it context-free), rendered into
+  per-context cached AudioBuffers by synth.js, so offline exports stay
+  bit-identical. The string rings past its step by design; `len` still rules
+  how long it is held, like pads.
+- The HINTS toggle (`state.tipsOn`) gates the shared tooltip AND native
+  `title` attrs (song chips re-render on the `tips` bus event). It is
+  session-only on purpose: the app stores nothing between visits.
 
 ## House Rules
 

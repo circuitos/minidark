@@ -4,33 +4,38 @@
    REGISTRY SCHEMA (pure data — append entries, never logic):
      {
        id:       string   unique key. Display name lives in CONTENT.libNames[id]
-                          (CONTENT owns all user-facing strings).
-       category: string   one of: drums | bass | lead | pad | fm | fxhit
+                          (CONTENT owns all user-facing strings); real-world
+                          lore + Wikipedia link live in CONTENT.libInfo[id].
+       category: string   one of: drums | bass | lead | pad | fm | guitar | fxhit
        tags:     [string] free-form search/filter hints (not user-facing copy)
        track:    number?  suggested default track index (0..7), optional
        baseNote: number?  suggested MIDI note for previews/steps, optional
        source:   one of
          { type:"synth",  patch:{...} }        synthesized; patch feeds
                                                js/engine/synth.js. patch.engine:
-                                               "sub" | "fm" | "drum"
+                                               "sub" | "fm" | "pluck" | "drum"
          { type:"base64", mime, data }         embedded audio file (decoded via
                                                decodeAudioData at load time)
          { type:"url",    href }               remote audio file (fetched then
                                                decoded)
      }
-   v1 ships 100% synth sources (no audio assets needed), but resolve()
-   already implements all three types so the library can grow by appending
-   entries with NO logic changes.
+   The registry ships 100% synth sources (no audio assets needed), but
+   resolve() implements all three types. Imported user samples are runtime
+   entries of type "base64", registered via registerUser() below; their data
+   lives in the project file (state.js owns that), never in this registry.
 
    PATCH SCHEMAS (source.type === "synth"):
-     engine:"sub"  — osc1/osc2: "sawtooth"|"pulse"|"square"|"triangle"|"sine",
-                     semi (osc2 semitones), detune (cents), mix (0..1),
-                     glide (s), cutoff (Hz), res (Q), envAmt (Hz), fDec (s),
-                     a,d,s,r (ADSR), drive (0..1), gain (0..1)
-     engine:"fm"   — ratio, index, iDec (s), a,d,s,r, gain
-     engine:"drum" — kind: "kick"|"snare"|"hatC"|"hatO"|"clap"|"grind"|"clank",
-                     dTune (rate mult), dDecay (0..1), dTone (0..1),
-                     dDrive (0..1), gain
+     engine:"sub"   — osc1/osc2: "sawtooth"|"pulse"|"square"|"triangle"|"sine",
+                      semi (osc2 semitones), detune (cents), mix (0..1),
+                      glide (s), cutoff (Hz), res (Q), envAmt (Hz), fDec (s),
+                      a,d,s,r (ADSR), drive (0..1), gain (0..1)
+     engine:"fm"    — ratio, index, iDec (s), a,d,s,r, gain
+     engine:"pluck" — Karplus-Strong string (guitars): decay (0..1 ring time),
+                      bright (0..1 pick tone), pick (0..1 position comb),
+                      body (0..1 resonance), drive (0..1), gain (0..1)
+     engine:"drum"  — kind: "kick"|"snare"|"hatC"|"hatO"|"clap"|"grind"|"clank",
+                      dTune (rate mult), dDecay (0..1), dTone (0..1),
+                      dDrive (0..1), gain
    ========================================================================== */
 window.MDS = window.MDS || {};
 
@@ -128,6 +133,19 @@ MDS.SOUND_LIBRARY = [
   { id: "padSweep", category: "pad", tags: ["sweep", "filter", "movement"], track: 6, baseNote: 45,
     source: { type: "synth", patch: { engine: "sub", osc1: "pulse", osc2: "sawtooth", semi: 0, detune: 14, mix: 0.5, glide: 0,
       cutoff: 300, res: 6, envAmt: 4200, fDec: 1.5, a: 0.45, d: 1.1, s: 0.75, r: 1.1, drive: 0.15, gain: 0.45 } } },
+  /* ── Guitars (Karplus-Strong strings; see engine:"pluck" schema above) ── */
+  { id: "gtrSteel", category: "guitar", tags: ["acoustic", "steel", "pluck"], track: 5, baseNote: 52,
+    source: { type: "synth", patch: { engine: "pluck", decay: 0.75, bright: 0.85, pick: 0.55, body: 0.6, drive: 0, gain: 0.8 } } },
+  { id: "gtrNylon", category: "guitar", tags: ["acoustic", "nylon", "soft"], track: 5, baseNote: 48,
+    source: { type: "synth", patch: { engine: "pluck", decay: 0.65, bright: 0.28, pick: 0.35, body: 0.75, drive: 0, gain: 0.85 } } },
+  { id: "gtrClean", category: "guitar", tags: ["electric", "clean", "chorus"], track: 5, baseNote: 52,
+    source: { type: "synth", patch: { engine: "pluck", decay: 0.85, bright: 0.7, pick: 0.6, body: 0.15, drive: 0.06, gain: 0.75 } } },
+  { id: "gtrMute", category: "guitar", tags: ["electric", "palm-mute", "chug"], track: 4, baseNote: 40,
+    source: { type: "synth", patch: { engine: "pluck", decay: 0.1, bright: 0.6, pick: 0.2, body: 0.3, drive: 0.4, gain: 0.9 } } },
+  { id: "gtrCrunch", category: "guitar", tags: ["electric", "distorted", "riff"], track: 5, baseNote: 45,
+    source: { type: "synth", patch: { engine: "pluck", decay: 0.6, bright: 0.75, pick: 0.45, body: 0.2, drive: 0.55, gain: 0.7 } } },
+  { id: "gtrStack", category: "guitar", tags: ["electric", "distorted", "heavy", "wall"], track: 5, baseNote: 40,
+    source: { type: "synth", patch: { engine: "pluck", decay: 0.7, bright: 0.65, pick: 0.4, body: 0.25, drive: 0.9, gain: 0.62 } } },
   /* ── FM ── */
   { id: "fmBell", category: "fm", tags: ["bell", "metallic", "fm"], track: 5, baseNote: 69,
     source: { type: "synth", patch: { engine: "fm", ratio: 3.5, index: 6, iDec: 0.35, a: 0.002, d: 0.5, s: 0.1, r: 0.4, gain: 0.6 } } },
@@ -144,15 +162,33 @@ MDS.lib = (function () {
   const byId = {};
   for (const e of MDS.SOUND_LIBRARY) byId[e.id] = e;
 
+  /* Imported user samples: runtime entries, same shape as registry entries
+     plus a `name` (user data, so it lives here, not in CONTENT). Registered
+     by state.js from project.samples-equivalent data; see state.addSample. */
+  const userById = {};
+
   const bufferCache = {}; // id → AudioBuffer (decoded base64/url sources)
 
-  function get(id) { return byId[id]; }
+  function get(id) { return byId[id] || userById[id]; }
+
+  function registerUser(entry) {
+    userById[entry.id] = entry;
+    return entry;
+  }
+  function unregisterUser(id) {
+    delete userById[id];
+    delete bufferCache[id];
+  }
+  function userList() { return Object.values(userById); }
+
+  /* Seed the decode cache (the import UI already decoded the file once). */
+  function cacheBuffer(id, buf) { bufferCache[id] = buf; }
 
   /* Deep-copy a playable patch for a track, so knob edits never mutate the
      registry. Buffer-backed sources become {engine:"buffer"} patches whose
      .buffer is filled asynchronously by resolve(). */
   function materialize(id) {
-    const e = byId[id];
+    const e = get(id);
     if (!e) return null;
     if (e.source.type === "synth") return JSON.parse(JSON.stringify(e.source.patch));
     return { engine: "buffer", buffer: bufferCache[id] || null, dTune: 1, gain: 0.9, _pendingId: id };
@@ -168,7 +204,7 @@ MDS.lib = (function () {
   /* Resolve an entry so it is ready to play in the given context.
      Handles all three source types (see schema above). */
   function resolve(ctx, id) {
-    const e = byId[id];
+    const e = get(id);
     if (!e) return Promise.reject(new Error("unknown-sound:" + id));
     switch (e.source.type) {
       case "synth":
@@ -192,5 +228,5 @@ MDS.lib = (function () {
     return MDS.SOUND_LIBRARY.filter((e) => !category || category === "all" || e.category === category);
   }
 
-  return { get, materialize, resolve, list };
+  return { get, materialize, resolve, list, registerUser, unregisterUser, userList, cacheBuffer };
 })();

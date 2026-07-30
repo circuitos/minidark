@@ -1,8 +1,8 @@
 /* ============================================================================
    ███ ENGINE ███  synth.js — all voices: subtractive synth, FM synth, the
-   fully synthesized drum kit, and sample-buffer playback. Works identically
-   against the live graph and the offline (export) graph.
-   No DOM, no user-facing strings.
+   fully synthesized drum kit, Karplus-Strong plucked strings (guitars), and
+   sample-buffer playback. Works identically against the live graph and the
+   offline (export) graph. No DOM, no user-facing strings.
 
    Public API:
      trigger(g, trackIdx, patch, opts)        // scheduled note with duration
@@ -273,8 +273,67 @@ MDS.synth = (function () {
     return { release() { /* drums are one-shots */ } };
   }
 
-  /* ── Buffer playback (library entries of source type base64/url) ────── */
+  /* ── Karplus-Strong plucked string (guitars) ──────────────────────────
+     The string itself is rendered by dsp.karplus into an AudioBuffer, then
+     played through body resonance (peaking filter) and optional drive.
+     Buffers are cached per context and per quantized (note, decay, bright,
+     pick) so a running pattern reuses its strings instead of re-rendering. */
+  const pluckCache = new WeakMap(); // ctx → Map(key → AudioBuffer)
+  function pluckBuffer(ctx, note, patch) {
+    let byKey = pluckCache.get(ctx);
+    if (!byKey) { byKey = new Map(); pluckCache.set(ctx, byKey); }
+    const q = (v) => Math.round((v || 0) * 50) / 50;
+    const key = note + "|" + q(patch.decay) + "|" + q(patch.bright) + "|" + q(patch.pick);
+    let buf = byKey.get(key);
+    if (!buf) {
+      if (byKey.size > 48) byKey.clear(); // knob sweeps must not hoard memory
+      const data = dsp.karplus(ctx.sampleRate, dsp.midiToFreq(note), patch);
+      buf = ctx.createBuffer(1, data.length, ctx.sampleRate);
+      buf.copyToChannel(data, 0);
+      byKey.set(key, buf);
+    }
+    return buf;
+  }
+
+  function pluckVoice(ctx, dest, patch, note, vel, t0) {
+    const s = ctx.createBufferSource();
+    s.buffer = pluckBuffer(ctx, note, patch);
+
+    // Body resonance: a low peaking bump, the "wood" under the string.
+    const body = patch.body == null ? 0.3 : patch.body;
+    const bodyF = ctx.createBiquadFilter();
+    bodyF.type = "peaking";
+    bodyF.frequency.value = 90 + body * 130;
+    bodyF.Q.value = 1;
+    bodyF.gain.value = body * 7;
+
+    const amp = ctx.createGain();
+    amp.gain.value = vel * (patch.gain == null ? 0.8 : patch.gain) * 0.6;
+
+    s.connect(bodyF);
+    let out = bodyF;
+    if ((patch.drive || 0) > 0.02) {
+      const sh = ctx.createWaveShaper(); sh.oversample = "2x";
+      sh.curve = driveCurve(patch.drive);
+      bodyF.connect(sh); out = sh;
+    }
+    out.connect(amp); amp.connect(dest);
+    s.start(t0);
+    s.onended = () => amp.disconnect();
+    return {
+      release(tOff) {
+        // A let-go string is damped, not cut: short fade, longer on open sounds.
+        const tc = 0.05 + (patch.decay || 0) * 0.07;
+        amp.gain.setTargetAtTime(0, tOff, tc);
+        s.stop(tOff + tc * 5 + 0.05);
+      },
+    };
+  }
+
+  /* ── Buffer playback (imported samples; base64/url library sources) ─── */
   function bufferVoice(ctx, dest, patch, note, vel, t0) {
+    // A sample can be triggered before its async decode lands; skip silently.
+    if (!patch.buffer || !patch.buffer.length) return { release() {} };
     const s = ctx.createBufferSource();
     s.buffer = patch.buffer;
     // Melodic use: repitch relative to middle C; drums leave note at 60.
@@ -296,6 +355,7 @@ MDS.synth = (function () {
     switch (patch.engine) {
       case "sub": return subVoice(ctx, dest, patch, note, vel, t0, glideFrom);
       case "fm": return fmVoice(ctx, dest, patch, note, vel, t0);
+      case "pluck": return pluckVoice(ctx, dest, patch, note, vel, t0);
       case "drum": return drumVoice(ctx, dest, patch, vel, t0);
       case "buffer": return bufferVoice(ctx, dest, patch, note, vel, t0);
       default: return { release() {} };
@@ -323,11 +383,12 @@ MDS.synth = (function () {
     };
   }
 
-  /* Audition a patch straight into the master bus (library preview). */
+  /* Audition a patch straight into the master bus (library preview).
+     A plucked string gets a longer gate: its whole point is the ring. */
   function preview(g, patch, note) {
     const t = g.ctx.currentTime + 0.001;
     const v = spawn(g.ctx, g.master.input, patch, note == null ? 57 : note, 0.9, t, null);
-    v.release(t + (patch.engine === "drum" ? 0.3 : 0.45));
+    v.release(t + (patch.engine === "drum" ? 0.3 : patch.engine === "pluck" ? 1.2 : 0.45));
   }
 
   /* Hold-to-play voice into an arbitrary destination (lesson demos).

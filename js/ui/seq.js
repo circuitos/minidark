@@ -455,7 +455,7 @@ MDS.ui.seq = (function () {
       const chip = document.createElement("span");
       chip.className = "chip"; chip.textContent = String(pIdx + 1);
       chip.dataset.pos = String(i);
-      chip.title = C().seq.chipHint;
+      if (S().tipsOn !== false) chip.title = C().seq.chipHint; // native hover help obeys HINTS too
       if (grab && grab.pos === i) chip.classList.add("is-grabbed");
       chip.onpointerdown = (e) => { if (e.button === 0) armChipGrab(i, e); };
       chip.onclick = (e) => {
@@ -525,6 +525,7 @@ MDS.ui.seq = (function () {
     MDS.bus.on("pattern", refreshGrid);
     MDS.bus.on("mix", refreshGrid);
     MDS.bus.on("song", refreshSong);
+    MDS.bus.on("tips", refreshSong);   // re-render chips so titles follow HINTS
     // keep the transport volume in step with the FX/MASTER fader
     MDS.bus.on("master", () => {
       if (els.masterVol) els.masterVol.set(S().project.master.vol, false);

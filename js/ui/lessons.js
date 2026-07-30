@@ -58,7 +58,8 @@ MDS.ui.toast = (function () {
 /* ── Glossary ──────────────────────────────────────────────────────────── */
 MDS.ui.glossary = (function () {
   "use strict";
-  function open() {
+  /* Optional `query` prefills the search (library ⓘ notes deep-link here). */
+  function open(query) {
     const m = MDS.ui.modal.open({ title: MDS.CONTENT.glossaryTitle });
     const search = document.createElement("input");
     search.type = "text"; search.placeholder = MDS.CONTENT.glossarySearch;
@@ -73,7 +74,8 @@ MDS.ui.glossary = (function () {
       }
     }
     search.oninput = () => render(search.value);
-    render("");
+    if (query) search.value = query;
+    render(query || "");
     m.body.append(search, dl);
   }
   return { open };

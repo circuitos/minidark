@@ -14,6 +14,34 @@
     return e;
   }
 
+  /* Circular-arrow icon for undo (counter-clockwise) / redo (clockwise):
+     a 300° arc with the head at the top edge of the gap, mirrored for redo.
+     Inline SVG in currentColor, so it follows button state like text would. */
+  function historyIcon(clockwise) {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 20 20");
+    svg.setAttribute("class", "btn-icon");
+    svg.setAttribute("aria-hidden", "true");
+    const g = document.createElementNS(NS, "g");
+    if (clockwise) g.setAttribute("transform", "translate(20 0) scale(-1 1)");
+    // Browser-reload composition, mirrored: a 280° arc (center (10,11), r 6)
+    // whose head dives counter-clockwise into the empty gap on the upper
+    // left, arc trailing behind it. Mirrored, it turns clockwise (redo).
+    const arc = document.createElementNS(NS, "path");
+    arc.setAttribute("d", "M 5.1 14.4 A 6 6 0 1 0 5.8 6.8");
+    arc.setAttribute("fill", "none");
+    arc.setAttribute("stroke", "currentColor");
+    arc.setAttribute("stroke-width", "2");
+    arc.setAttribute("stroke-linecap", "round");
+    const head = document.createElementNS(NS, "path");
+    head.setAttribute("d", "M 2.5 10 L 4.6 5.6 L 7 8 Z");
+    head.setAttribute("fill", "currentColor");
+    g.append(arc, head);
+    svg.appendChild(g);
+    return svg;
+  }
+
   function buildTopbar(bar) {
     bar.className = "topbar";
     const logo = el("span", "logo", C().app.title);
@@ -27,10 +55,15 @@
 
     const grow = el("span", "grow");
 
-    /* History pair: greyed out when there is nothing left in that direction,
-       so the buttons also say how much room you have to experiment. */
-    const undo = el("button", null, C().transport.undo); undo.dataset.tt = "undo";
-    const redo = el("button", null, C().transport.redo); redo.dataset.tt = "redo";
+    /* History pair: circular-arrow icons (counter-clockwise = undo), greyed
+       out when there is nothing left in that direction, so the buttons also
+       say how much room you have to experiment. Names live on aria-label. */
+    const undo = el("button", "icon-btn"); undo.dataset.tt = "undo";
+    undo.setAttribute("aria-label", C().transport.undo);
+    undo.appendChild(historyIcon(false));
+    const redo = el("button", "icon-btn"); redo.dataset.tt = "redo";
+    redo.setAttribute("aria-label", C().transport.redo);
+    redo.appendChild(historyIcon(true));
     undo.onclick = () => MDS.history.undo();
     redo.onclick = () => MDS.history.redo();
     const syncHistory = () => {
@@ -76,7 +109,19 @@
     const glo = el("button", null, C().transport.glossary); glo.dataset.tt = "glossary";
     glo.onclick = () => MDS.ui.glossary.open();
 
-    bar.append(logo, sub, nameIn, grow, undo, redo, save, openBtn, fileIn, reset, exp, les, glo);
+    /* HINTS: hover/alt help text on or off (session preference; the app
+       stores nothing between visits, by design). */
+    const hints = el("button", null, C().transport.hints); hints.dataset.tt = "tips";
+    const syncHints = () => hints.classList.toggle("is-on", S().tipsOn !== false);
+    hints.onclick = () => {
+      S().tipsOn = !S().tipsOn;
+      syncHints();
+      MDS.ui.tooltip.hide();
+      MDS.bus.emit("tips");
+    };
+    syncHints();
+
+    bar.append(logo, sub, nameIn, grow, undo, redo, save, openBtn, fileIn, reset, exp, les, glo, hints);
   }
 
   function confirmReset() {
