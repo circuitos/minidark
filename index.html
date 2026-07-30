@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+  MINIDARK — a tiny dark-synth studio for absolute beginners.
+  Late-80s industrial / dark synth-pop palette. Web Audio only, no server,
+  no build step, no localStorage (persistence = project file export).
+
+  ARCHITECTURE (loud banners in each file):
+    THEME    css/theme.css        — every design token; restyle here only
+    UI       css/app.css, js/ui/* — components; tokens + CONTENT keys only
+    CONTENT  js/content.js        — every user-facing string
+    ENGINE   js/engine/*          — audio graph, voices, clock, export
+    DATA     js/library.js        — SOUND_LIBRARY registry (schema in file)
+             js/demos.js          — three original demo tracks
+
+  JUDGMENT CALL: classic <script> tags (one global: MDS) instead of ES
+  modules, so the app also works from file:// where module CORS rules bite.
+  Load order below IS the dependency order.
+=========================================================================== -->
+<html data-build="2ad4f9015f6b" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- CSP (meta form; GitHub Pages can't set HTTP headers). script-src allows
+       only self + cdnjs (lamejs); connect-src 'self' so injected code can't
+       phone home. No inline scripts/styles anywhere, so no 'unsafe-inline'. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>MINIDARK — a tiny dark-synth studio</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230c0d10'/%3E%3Ccircle cx='8' cy='8' r='4' fill='none' stroke='%23e0483c' stroke-width='2'/%3E%3Cline x1='8' y1='8' x2='11' y2='5' stroke='%23e6e8ec' stroke-width='1.5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/theme.css?v=2ad4f9015f6b">
+  <link rel="stylesheet" href="css/app.css?v=2ad4f9015f6b">
+</head>
+<body>
+  <div id="app" class="app"></div>
+
+  <!-- BOOT (namespace + lamejs loader; kept in a file for the CSP) -->
+  <script src="js/boot.js?v=2ad4f9015f6b"></script>
+  <!-- CONTENT -->
+  <script src="js/content.js?v=2ad4f9015f6b"></script>
+  <!-- ENGINE -->
+  <script src="js/engine/dsp.js?v=2ad4f9015f6b"></script>
+  <script src="js/engine/graph.js?v=2ad4f9015f6b"></script>
+  <script src="js/engine/synth.js?v=2ad4f9015f6b"></script>
+  <script src="js/engine/sequencer.js?v=2ad4f9015f6b"></script>
+  <script src="js/engine/export.js?v=2ad4f9015f6b"></script>
+  <!-- DATA -->
+  <script src="js/library.js?v=2ad4f9015f6b"></script>
+  <script src="js/state.js?v=2ad4f9015f6b"></script>
+  <script src="js/demos.js?v=2ad4f9015f6b"></script>
+  <!-- UI -->
+  <script src="js/ui/knob.js?v=2ad4f9015f6b"></script>
+  <script src="js/ui/fader.js?v=2ad4f9015f6b"></script>
+  <script src="js/ui/tooltip.js?v=2ad4f9015f6b"></script>
+  <script src="js/ui/meter.js?v=2ad4f9015f6b"></script>
+  <script src="js/ui/seq.js?v=2ad4f9015f6b"></script>
+  <script src="js/ui/keyboard.js?v=2ad4f9015f6b"></script>
+  <script src="js/ui/panels.js?v=2ad4f9015f6b"></script>
+  <script src="js/ui/lessons.js?v=2ad4f9015f6b"></script>
+  <script src="js/ui/exportui.js?v=2ad4f9015f6b"></script>
+  <script src="js/main.js?v=2ad4f9015f6b"></script>
+</body>
+</html>

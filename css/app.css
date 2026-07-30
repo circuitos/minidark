@@ -1,0 +1,812 @@
+/* ============================================================================
+   ███ UI STYLES ███  Component styling. References THEME tokens ONLY —
+   no raw colors, no magic pixel values (see css/theme.css).
+   "IRON, machined": flat charcoal modules split by dark seams; depth from
+   thin luminous arcs and outlined active chips, never gradients or glows.
+   ========================================================================== */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--c-bg0);
+  color: var(--c-ink0);
+  font-family: var(--font-ui);
+  font-size: var(--fs-m);
+  line-height: var(--lh);
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--c-accent2); text-decoration: none; }
+a:hover { color: var(--c-ink0); }
+
+/* Thin, quiet scrollbars (hardware chrome, not browser chrome). */
+* { scrollbar-width: thin; scrollbar-color: var(--c-line) transparent; }
+*::-webkit-scrollbar { width: var(--sp-2); height: var(--sp-2); }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--c-line); border-radius: var(--r-s); }
+*::-webkit-scrollbar-thumb:hover { background: var(--c-bg3); }
+
+button {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: var(--fs-s);
+  color: var(--c-ink1);
+  background: var(--c-bg2);
+  /* Resting buttons must carry a visible edge: it is the only thing that makes
+     them read as controls on same-tone surfaces (mute/solo, chips). */
+  border: var(--bw) solid var(--c-edge);
+  border-radius: var(--r-s);
+  padding: var(--sp-2) var(--sp-3);
+  min-height: 1.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease), transform var(--dur-1) var(--ease);
+}
+button:hover { background: var(--c-bg3); color: var(--c-ink0); }
+button:active { transform: translateY(1px); }
+/* A control with nothing to do (UNDO at the start of a session) stays in
+   place and dims, rather than disappearing and moving its neighbours. */
+button:disabled, button:disabled:hover {
+  color: var(--c-ink2); border-color: var(--c-hair);
+  background: var(--c-bg1); opacity: 0.55; cursor: default; transform: none;
+}
+/* Small controls sitting ON a raised surface get an inset dark well, so they
+   read against their container instead of matching it (like the step pads). */
+.row-head .mini, .strip .ms button, .chip {
+  background: var(--c-bg0);
+  border-color: var(--c-edge);
+}
+.row-head .mini:hover, .strip .ms button:hover, .chip:hover { background: var(--c-bg3); }
+/* Active state for those same small controls. Needs matching specificity: the
+   resting rule above outranks the shared button.is-on, so the ember outline
+   has to be restated here (this is also the only place the mixer M/S gets it). */
+.row-head .mini.is-on, .strip .ms button.is-on, .chip.is-play {
+  background: transparent;
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+
+/* Active toggle = ember OUTLINED chip (transparent fill): the signature
+   active-state of flat instrument UIs. */
+button.is-on {
+  background: transparent;
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+button:focus-visible, .knob:focus-visible, .cell:focus-visible {
+  outline: calc(var(--bw) * 2) solid var(--c-accent2);
+  outline-offset: var(--sp-1);
+}
+input[type="text"], select {
+  background: var(--c-bg2);
+  color: var(--c-ink0);
+  border: var(--bw) solid var(--c-hair);
+  border-radius: var(--r-s);
+  padding: var(--sp-2);
+  min-height: 1.9rem;
+  font-family: var(--font-ui);
+  font-size: var(--fs-s);
+  transition: border-color var(--dur-2) var(--ease);
+}
+input[type="text"]:focus, select:focus { outline: none; border-color: var(--c-accent2); }
+h1 { font-size: var(--fs-xl); font-weight: 600; letter-spacing: 0.02em; }
+h2 { font-size: var(--fs-l); font-weight: 600; color: var(--c-ink0); }
+h3 {
+  font-size: var(--fs-xs); color: var(--c-ink2); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--track-caps);
+}
+
+/* Native range inputs are no longer used in the UI (the lesson widget now uses
+   MDS.ui.fader). These rules remain as a safe, visible baseline in case one is
+   ever added: a lighter track so the bar reads against dark panels. */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 1.9rem; background: transparent; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.24rem; border-radius: var(--r-s); background: var(--c-bg3);
+}
+input[type="range"]::-moz-range-track { height: 0.24rem; border-radius: var(--r-s); background: var(--c-bg3); }
+input[type="range"]::-moz-range-progress { height: 0.24rem; border-radius: var(--r-s); background: var(--c-accent2); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 1rem; height: 1rem; margin-top: -0.38rem; border-radius: 50%;
+  background: var(--c-ink0); border: calc(var(--bw) * 2) solid var(--c-accent2);
+  transition: transform var(--dur-1) var(--ease);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 1rem; height: 1rem; border-radius: 50%;
+  background: var(--c-ink0); border: calc(var(--bw) * 2) solid var(--c-accent2);
+}
+input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+input[type="range"]:focus-visible { outline: none; }
+input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw) * 2) solid var(--c-accent2); outline-offset: var(--sp-1); }
+
+/* ── Power-on overlay ─────────────────────────────────────────────────── */
+.power-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: var(--c-bg0);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-4); text-align: center; padding: var(--sp-5);
+}
+.power-overlay .logo { font-size: calc(var(--fs-xl) * 1.6); letter-spacing: 0.3em; font-weight: 600; }
+.power-overlay .tagline { color: var(--c-ink1); max-width: 34rem; }
+.power-btn {
+  font-size: var(--fs-l); font-weight: 600; color: var(--c-accent);
+  padding: var(--sp-3) var(--sp-6); min-height: 2.75rem;
+  border-radius: var(--r-m);
+  border-color: var(--c-accent);
+  background: transparent;
+  text-transform: uppercase; letter-spacing: var(--track-caps);
+}
+.power-btn:hover { background: var(--c-accent-soft); color: var(--c-ink0); }
+
+/* ── App layout ───────────────────────────────────────────────────────── */
+.app { display: none; flex-direction: column; height: 100%; max-width: var(--maxw); margin: 0 auto; }
+.app.is-ready { display: flex; }
+
+.topbar {
+  min-height: var(--topbar-h);
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--c-bg1);
+  border-bottom: var(--bw) solid var(--c-seam);
+}
+.topbar .logo {
+  font-weight: 600; letter-spacing: 0.24em; color: var(--c-ink0);
+  font-size: var(--fs-l);
+}
+.topbar .logo::first-letter { color: var(--c-accent); }
+.topbar .grow { flex: 1; }
+.topbar .proj-name { width: 11rem; }
+/* Icon-only buttons (undo/redo): square hit target, glyph in currentColor. */
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 1.9rem; padding: var(--sp-2); }
+.btn-icon { width: 1.05rem; height: 1.05rem; display: block; }
+.tbgroup { display: flex; align-items: center; gap: var(--sp-2); }
+/* Sound picker and its RANDOMIZE button share one line above the dials. */
+.inst-head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.inst-head .tbgroup { flex: 1 1 auto; min-width: 0; }
+.inst-head .tbgroup select { flex: 1 1 auto; min-width: 0; }
+
+.main {
+  flex: 1; display: flex; gap: var(--sp-3);
+  padding: var(--sp-3); overflow: hidden; min-height: 0;
+}
+.left-col { flex: 1; display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; overflow-y: auto; }
+.right-col { width: var(--panel-w); flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; }
+
+@media (max-width: 68rem) {
+  .main { flex-direction: column; overflow-y: auto; }
+  .left-col { flex: none; overflow: visible; }
+  .right-col { width: 100%; flex: none; }
+  .panel { flex: none; }
+  .panel-body { overflow-y: visible; }
+}
+
+/* Shared flat module surface (panels, transport, seq, keyboard):
+   flat iron slabs on soot, separated by dark seams; no blur, no gloss. */
+.transport, .seq-box, .kbd-box, .panel {
+  background: var(--c-bg1);
+  border: var(--bw) solid var(--c-seam);
+  border-radius: var(--r-l);
+  box-shadow: var(--sh-inset);
+}
+
+/* ── Transport ────────────────────────────────────────────────────────── */
+/* One shared control height (--tp-h) plus hairline-separated cells: every
+   control centers on the same band, so nothing floats at its own height. */
+.transport {
+  display: flex; align-items: stretch; flex-wrap: wrap; gap: 0;
+  padding: var(--sp-2) var(--sp-4);
+}
+.tp-cell {
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--sp-3); min-height: var(--tp-h);
+  padding: 0 var(--sp-3);
+}
+.tp-cell:first-child { padding-left: 0; }
+.tp-cell + .tp-cell { border-left: var(--bw) solid var(--c-hair); }
+.transport .grow { flex: 1; }
+.transport .t-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  font-size: var(--fs-m); font-weight: 600; padding: var(--sp-2) var(--sp-3);
+  min-height: 2.5rem; min-width: 5.8rem;
+  letter-spacing: var(--track-caps); text-transform: uppercase;
+  color: var(--c-ink0);
+}
+/* Classic play triangle, becoming a stop square while running. */
+.t-icon {
+  width: 0; height: 0; flex-shrink: 0;
+  border-left: 0.62rem solid currentColor;
+  border-top: 0.38rem solid transparent;
+  border-bottom: 0.38rem solid transparent;
+}
+.t-btn.is-playing .t-icon {
+  width: 0.62rem; height: 0.7rem; border: 0; background: currentColor;
+}
+.transport .t-btn.is-playing {
+  background: transparent;
+  border-color: var(--c-accent); color: var(--c-accent);
+}
+/* Fixed width, tabular figures, zero-padded counters (seq.js): the readout is
+   the only text in the transport that changes while playing, so if it can
+   grow, every control to its right jitters. Sized for "bar 128 · step 16". */
+.transport .pos-readout {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: var(--c-ink1); font-size: var(--fs-s); min-width: 8.3rem;
+}
+/* Knob and fader columns inside the transport share one label rhythm. */
+.tp-cell .knob, .tp-cell .fader { padding: 0; }
+.tp-cell .knob .k-value, .tp-cell .fader .f-value { line-height: 1.2; }
+
+/* ── Sequencer ────────────────────────────────────────────────────────── */
+.seq-box {
+  padding: var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-3);
+}
+/* Shared header rhythm (sequencer, song, keyboard): one band height, cells
+   separated by hairlines, trailing hint pushed to the right edge. Same
+   language as the transport's .tp-cell. */
+.seq-head, .song-head, .kbd-head {
+  display: flex; align-items: center; gap: 0; flex-wrap: wrap;
+  min-height: var(--hd-h);
+}
+.hd-cell {
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-height: var(--hd-h); padding: 0 var(--sp-3);
+}
+.hd-cell:first-child { padding-left: 0; }
+.hd-cell + .hd-cell { border-left: var(--bw) solid var(--c-hair); }
+.hd-cell > h3 { flex-shrink: 0; }
+.hd-cell:empty { display: none; }
+/* Trailing hint: right edge of its header. */
+.seq-help.is-right { margin-left: auto; text-align: right; padding-left: var(--sp-3); }
+.pat-bank { display: flex; gap: var(--sp-1); }
+.pat-bank button { min-width: 2rem; min-height: 2rem; font-family: var(--font-mono); }
+.pat-bank button.is-cur { border-color: var(--c-accent2); color: var(--c-ink0); background: var(--c-bg3); }
+.pat-bank button.is-live { color: var(--c-accent); }
+
+/* Faint signal-grid matrix behind the steps. It can only line up inside each
+   4-step group: the beat gap shifts every group rightward, so past the first
+   beat it reads as texture, not as a ruler. Decided and accepted (audit
+   G1-7): it is a backdrop. */
+.grid-scroll { overflow-x: auto; border-radius: var(--r-m); padding: var(--sp-1) 0; }
+.grid {
+  display: flex; flex-direction: column; gap: var(--cell-gap); width: max-content;
+  background-image:
+    linear-gradient(var(--c-grid-line) var(--bw), transparent var(--bw)),
+    linear-gradient(90deg, var(--c-grid-line) var(--bw), transparent var(--bw));
+  background-size: calc(var(--cell-w) + var(--cell-gap)) calc(var(--cell-h) + var(--cell-gap));
+}
+.grid-row { display: flex; align-items: center; gap: var(--cell-gap); }
+.row-head {
+  width: var(--rowhead-w); flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-2);
+  border-radius: var(--r-s); padding: var(--sp-2); min-height: var(--cell-h);
+  cursor: pointer; border: var(--bw) solid var(--c-line); background: var(--c-bg2);
+  font-size: var(--fs-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em;
+  transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.row-head:hover { background: var(--c-bg3); }
+.row-head.is-sel { border-color: var(--c-accent2); background: var(--c-bg3); }
+.row-head .led {
+  width: var(--sp-2); height: var(--sp-2); border-radius: 50%;
+  background: var(--row-hue); flex-shrink: 0;
+}
+.row-head .mini { margin-left: auto; font-size: var(--fs-xs); padding: 0 var(--sp-1); min-height: 1.4rem; line-height: 1.3; }
+.row-head .mini + .mini { margin-left: 0; }
+
+
+.cell {
+  width: var(--cell-w); height: var(--cell-h); flex-shrink: 0;
+  border-radius: var(--r-s);
+  background: var(--c-bg2); border: var(--bw) solid transparent;
+  cursor: pointer; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-xs); font-family: var(--font-mono); color: var(--c-ink2);
+  user-select: none;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease),
+              transform var(--dur-1) var(--ease);
+}
+.cell[data-beat="1"] { margin-left: var(--cell-beat-gap); }
+.cell:hover { background: var(--c-bg3); }
+.cell.is-on { background: var(--row-hue); color: var(--c-bg0); border-color: var(--row-hue); font-weight: 500; }
+.cell.is-accent { box-shadow: inset 0 0 0 var(--bw) var(--c-bg0), inset 0 0 0 calc(var(--bw) * 3) var(--c-white); font-weight: bold; }
+.cell.is-play {
+  outline: calc(var(--bw) * 2) solid var(--c-white); outline-offset: calc(-2 * var(--bw));
+  z-index: 1;
+}
+/* Held note (cell.len > 1): the steps it covers read as one tie bar in the
+   row hue, bridging the gap back to the step that started it. */
+.cell.is-tail::after {
+  content: ""; position: absolute; top: 50%; right: 0;
+  left: calc(-1 * (var(--cell-gap) + var(--bw)));
+  height: calc(var(--bw) * 3); transform: translateY(-50%);
+  background: var(--row-hue); opacity: 0.5; border-radius: var(--r-s);
+}
+.cell.is-tail[data-beat="1"]::after { left: calc(-1 * (var(--cell-beat-gap) + var(--cell-gap) + var(--bw))); }
+.seq-help { color: var(--c-ink2); font-size: var(--fs-xs); }
+
+/* ── Song mode ────────────────────────────────────────────────────────── */
+.song-box { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+/* One continuous strip: the chain reads left to right like tape. Chips share
+   the available width equally and shrink to fit, so a long song needs no
+   scrollbar and never wraps into a clipped second line. */
+.chain {
+  display: flex; flex-wrap: nowrap; gap: var(--sp-1);
+  min-height: var(--sp-5); overflow: hidden;
+}
+.chain .chip {
+  flex: 1 1 0; min-width: 0; padding: var(--sp-1);
+  justify-content: center; text-align: center;
+  touch-action: pan-y;   /* vertical scroll stays the page's, sideways is ours */
+}
+/* Held block: lifted out of the chain while it is being repositioned. */
+.chain .chip.is-grabbed {
+  background: var(--c-bg3);
+  border-color: var(--c-accent2);
+  color: var(--c-ink0);
+  transform: translateY(calc(-1 * var(--sp-1)));
+  box-shadow: var(--sh-glow-cyan);
+  cursor: grabbing;
+}
+.chip {
+  font-family: var(--font-mono); font-size: var(--fs-s);
+  background: var(--c-bg0); border: var(--bw) solid var(--c-edge);
+  border-radius: var(--r-s); padding: var(--sp-1) var(--sp-3); min-height: 1.8rem;
+  display: inline-flex; align-items: center;
+  cursor: pointer; user-select: none;
+  transition: background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+}
+.chip:hover { background: var(--c-bg3); border-color: var(--c-accent); }
+
+
+/* ── Keyboard ─────────────────────────────────────────────────────────── */
+.kbd-box { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
+.kbd-head { font-size: var(--fs-s); color: var(--c-ink1); }
+.kbd { display: flex; position: relative; height: var(--kb-white-h); user-select: none; overflow-x: auto; }
+.key-w {
+  width: var(--kb-white-w); height: 100%; flex-shrink: 0;
+  background: var(--c-ink0);
+  border: var(--bw) solid var(--c-bg0);
+  border-radius: 0 0 var(--r-s) var(--r-s);
+  position: relative; cursor: pointer;
+  display: flex; align-items: flex-end; justify-content: center;
+  color: var(--c-bg1); font-size: var(--fs-xs); padding-bottom: var(--sp-1);
+  transition: background var(--dur-1) var(--ease);
+}
+.key-b {
+  width: var(--kb-black-w); height: var(--kb-black-h);
+  background: var(--c-bg0);
+  border: var(--bw) solid var(--c-edge);
+  border-radius: 0 0 var(--r-s) var(--r-s);
+  position: absolute; top: 0; z-index: 2; cursor: pointer;
+  display: flex; align-items: flex-end; justify-content: center;
+  color: var(--c-ink2); font-size: var(--fs-xs); padding-bottom: var(--sp-1);
+  transition: background var(--dur-1) var(--ease);
+}
+.key-w.is-down { background: var(--c-accent2); }
+.key-b.is-down { background: var(--c-accent2); color: var(--c-bg0); }
+.key-w.is-out, .key-b.is-out { opacity: 0.4; }
+
+/* ── Right panel / tabs ───────────────────────────────────────────────── */
+.panel { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.tabs { display: flex; border-bottom: var(--bw) solid var(--c-seam); }
+.tabs button {
+  flex: 1; border: none; border-radius: 0; background: transparent;
+  padding: var(--sp-3) var(--sp-2); min-height: 2.6rem; color: var(--c-ink2);
+  font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--track-caps); font-size: var(--fs-xs);
+  position: relative;
+}
+.tabs button::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--bw) * 2);
+  background: var(--c-accent); transform: scaleX(0); transition: transform var(--dur-2) var(--ease);
+}
+.tabs button:hover { color: var(--c-ink1); background: transparent; }
+.tabs button.is-cur { color: var(--c-ink0); }
+.tabs button.is-cur::after { transform: scaleX(1); }
+.panel-body { flex: 1; overflow-y: auto; padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.ctl-group {
+  border: var(--bw) solid var(--c-hair); border-radius: var(--r-m);
+  background: var(--c-glass2);
+  padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-3);
+  transition: border-color var(--dur-2) var(--ease);
+}
+.ctl-group.is-hot { border-color: var(--c-accent2); }
+.ctl-group > h3 { color: var(--c-ink2); }
+/* Control rows share one band height so successive groups read on a grid. */
+.ctl-row {
+  display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-4);
+  align-items: flex-start; min-height: var(--ctl-h);
+}
+/* Select controls inside a ctl-row: same vertical rhythm as a knob column,
+   via a control band exactly --knob-size tall (select centered in it) with
+   the small caps label beneath, so every label sits on the same line. */
+.ctl-sel {
+  display: grid; grid-template-rows: var(--knob-size) auto;
+  align-items: center; justify-items: center;
+  row-gap: var(--sp-1); padding: var(--sp-1);
+}
+.ctl-sel select { min-width: 4.2rem; text-align: center; }
+.ctl-sel .k-label { font-size: var(--fs-xs); color: var(--c-ink1); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; white-space: nowrap; }
+
+/* ── Knob ─────────────────────────────────────────────────────────────── */
+.knob {
+  display: inline-flex; flex-direction: column; align-items: center;
+  gap: var(--sp-1); cursor: ns-resize; touch-action: none; user-select: none;
+  width: calc(var(--knob-size) + var(--sp-4));
+  border-radius: var(--r-m); padding: var(--sp-1);
+}
+.knob.knob-s { width: calc(var(--knob-size-s) + var(--sp-3)); }
+.knob svg { width: var(--knob-size); height: var(--knob-size); overflow: visible; }
+.knob.knob-s svg { width: var(--knob-size-s); height: var(--knob-size-s); }
+.knob .k-label {
+  font-size: var(--fs-xs); font-weight: 500; color: var(--c-ink1);
+  text-transform: uppercase; letter-spacing: 0.06em; text-align: center;
+  /* One-line band: every control label occupies the same height, so the value
+     readouts align across every row. Labels are single words by design. */
+  white-space: nowrap; min-height: calc(var(--lh) * 1em);
+  display: flex; align-items: center; justify-content: center;
+}
+.knob .k-value {
+  font-size: var(--fs-xs); font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: var(--c-ink1); transition: color var(--dur-2) var(--ease);
+}
+.knob.is-active .k-value { color: var(--c-accent2); }
+.knob:focus-visible .k-label, .knob:hover .k-label { color: var(--c-ink0); }
+
+/* ── Signal path ──────────────────────────────────────────────────────── */
+.sigpath { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1); min-height: var(--hd-h); }
+.sig-node {
+  border: var(--bw) solid var(--c-edge); border-radius: var(--r-s);
+  background: var(--c-bg2); padding: var(--sp-2) var(--sp-3); min-height: 1.9rem;
+  font-size: var(--fs-xs); font-family: var(--font-mono); cursor: pointer;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-ink1);
+  transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+}
+.sig-node:hover { border-color: var(--c-accent2); color: var(--c-ink0); }
+.sig-arrow { color: var(--c-ink2); font-size: var(--fs-s); }
+
+/* ── Mixer ────────────────────────────────────────────────────────────── */
+.mixer { display: flex; gap: var(--sp-2); overflow-x: auto; padding-bottom: var(--sp-1); }
+.strip {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
+  border: var(--bw) solid var(--c-hair); border-radius: var(--r-m);
+  background: var(--c-glass2);
+  border-top: calc(2 * var(--bw)) solid var(--strip-hue);
+  padding: var(--sp-3) var(--sp-2); flex-shrink: 0;
+  width: 4.9rem;
+}
+/* Uniform name band so long track names never shift a strip's controls. */
+.strip .s-name {
+  width: 100%; min-height: 1.6rem;
+  font-size: var(--fs-xs); font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--c-ink1);
+}
+.strip .ms { display: flex; gap: var(--sp-1); }
+.strip .ms button { font-size: var(--fs-xs); padding: 0 var(--sp-2); min-height: 1.6rem; }
+.strip .sends { display: flex; flex-direction: column; gap: var(--sp-1); }
+
+/* ── Step column LEDs ─────────────────────────────────────────────────── */
+.col-leds {
+  display: flex; align-items: center; gap: var(--cell-gap);
+  margin-left: calc(var(--rowhead-w) + var(--cell-gap)); margin-bottom: var(--sp-1);
+  width: max-content;
+}
+.col-led {
+  width: var(--cell-w); height: var(--sp-1); flex-shrink: 0;
+  border-radius: var(--r-s); background: var(--c-line);
+  transition: background var(--dur-1) var(--ease);
+}
+.col-led[data-beat="1"] { background: var(--c-bg3); }
+.col-led[data-gap="1"] { margin-left: var(--cell-beat-gap); }
+.col-led.is-lit { background: var(--c-accent); }
+
+/* ── Segmented switch (waveform selectors) ────────────────────────────── */
+.sw-row { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.sw-label {
+  width: 3.4rem; flex-shrink: 0;
+  font-size: var(--fs-xs); font-weight: 500; color: var(--c-ink1);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.segmented {
+  display: flex; flex: 1; min-width: 0; gap: var(--bw);
+  background: var(--c-bg0); border: var(--bw) solid var(--c-hair);
+  border-radius: var(--r-s); padding: var(--bw);
+}
+.segmented button {
+  flex: 1 1 0; min-width: 0; background: transparent; border: var(--bw) solid transparent;
+  border-radius: calc(var(--r-s) - 1px);
+  padding: var(--sp-1); min-height: 1.7rem;
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.02em;
+  color: var(--c-ink2); overflow: hidden; text-overflow: ellipsis;
+}
+.segmented button:hover { background: var(--c-bg2); color: var(--c-ink0); }
+.segmented button.is-on {
+  background: var(--c-bg3); border-color: var(--c-accent); color: var(--c-accent);
+}
+
+/* ── Fader (channel + master volume) ──────────────────────────────────── */
+.fader {
+  display: inline-flex; flex-direction: column; align-items: center;
+  gap: var(--sp-1); cursor: ns-resize; touch-action: none; user-select: none;
+  width: 2.6rem; padding: var(--sp-1); border-radius: var(--r-m);
+}
+.fader .f-track {
+  position: relative; width: 0.5rem; height: var(--meter-h);
+  background: var(--c-bg0); border: var(--bw) solid var(--c-seam);
+  border-radius: var(--r-s);
+}
+.fader .f-fill {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: var(--c-accent2); border-radius: var(--r-s);
+}
+/* Cap: the grabbable handle, wider than the track like a real fader. */
+.fader .f-cap {
+  position: absolute; left: 50%; width: 1.5rem; height: 0.55rem;
+  transform: translate(-50%, 50%);
+  background: var(--c-bg3); border: var(--bw) solid var(--c-hair-strong);
+  border-radius: var(--r-s);
+  box-shadow: var(--sh-inset-strong);
+  transition: border-color var(--dur-2) var(--ease);
+}
+.fader:hover .f-cap, .fader.is-active .f-cap { border-color: var(--c-accent2); }
+.fader:focus-visible { outline: calc(var(--bw) * 2) solid var(--c-accent2); outline-offset: var(--sp-1); }
+.fader .f-label {
+  font-size: var(--fs-xs); font-weight: 500; color: var(--c-ink1);
+  text-transform: uppercase; letter-spacing: 0.06em; text-align: center;
+}
+.fader .f-value {
+  font-size: var(--fs-xs); font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: var(--c-ink1); transition: color var(--dur-2) var(--ease);
+}
+.fader.is-active .f-value { color: var(--c-accent2); }
+
+/* Horizontal variant (transport master volume): compact inline strip. */
+.fader.fader-h {
+  flex-direction: row; align-items: center; gap: var(--sp-2);
+  width: auto; cursor: ew-resize;
+}
+.fader.fader-h .f-track { width: 5.5rem; height: 0.5rem; }
+.fader.fader-h .f-fill { top: 0; bottom: 0; left: 0; right: auto; height: auto; }
+.fader.fader-h .f-cap {
+  left: auto; top: 50%; bottom: auto;
+  width: 0.55rem; height: 1.5rem; transform: translate(-50%, -50%);
+}
+.fader.fader-h .f-label { order: -1; }
+.fader.fader-h .f-value { min-width: 2.4rem; text-align: right; }
+
+/* Right-hand output cluster: vertical VOL + compact VU, both filling the band. */
+.out-group {
+  display: flex; align-items: stretch; gap: var(--sp-3);
+  min-height: var(--tp-h); padding: 0 0 0 var(--sp-3);
+  border-left: var(--bw) solid var(--c-hair);
+}
+.out-group .fader { width: 2.6rem; padding: 0; justify-content: space-between; }
+.out-group .fader .f-track { height: auto; flex: 1; }
+/* Match the knob rhythm: control, then caps label, then value. */
+.out-group .fader .f-label { order: 1; }
+.out-group .fader .f-value { order: 2; }
+.out-group .fader .f-label, .out-group .fader .f-value { font-size: var(--fs-xs); line-height: 1.2; }
+
+/* ── Master VU meter (signature) ──────────────────────────────────────── */
+.vu {
+  display: flex; align-items: flex-end; gap: var(--sp-3);
+  border: var(--bw) solid var(--c-hair); border-radius: var(--r-m);
+  background: var(--c-bg1);
+  padding: var(--sp-2) var(--sp-3);
+}
+.vu-cluster { display: flex; align-items: flex-end; gap: var(--sp-3); }
+.vu-col { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); }
+.vu-bar {
+  position: relative; width: var(--meter-w); height: var(--meter-h);
+  border-radius: var(--r-s); overflow: hidden;
+  background:
+    repeating-linear-gradient(0deg, var(--meter-off) 0, var(--meter-off) calc(var(--meter-h) / 24 - var(--bw)), transparent calc(var(--meter-h) / 24 - var(--bw)), transparent calc(var(--meter-h) / 24)),
+    var(--c-bg0);
+  border: var(--bw) solid var(--c-seam);
+}
+/* The rAF loop owns these transforms outright: a CSS transition here fights
+   the per-frame write and reads as choppy. No transitions on purpose. */
+.vu-fill { position: absolute; left: 0; right: 0; bottom: 0; top: 0;
+  transform-origin: bottom; transform: scaleY(0);
+  background: linear-gradient(0deg, var(--meter-lo) 0%, var(--meter-lo) 62%, var(--meter-mid) 82%, var(--meter-hi) 100%);
+  will-change: transform;
+}
+/* Peak-hold tick rides above the fill. */
+.vu-peak {
+  position: absolute; left: 0; right: 0; height: calc(var(--bw) * 2);
+  background: var(--c-ink0); opacity: 0; bottom: 0; will-change: transform;
+}
+.vu-col .vu-label { font-size: var(--fs-xs); font-family: var(--font-mono); color: var(--c-ink2); letter-spacing: 0.08em; }
+/* Gain-reduction bar hangs DOWNWARD from the top (limiter working). */
+.vu-gr .vu-bar { background: var(--c-bg0); }
+.vu-gr .vu-fill { transform-origin: top; background: var(--meter-gr); }
+.vu-readout {
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-s);
+}
+.vu-readout .vu-num { color: var(--c-ink0); }
+.vu-readout .vu-cap { color: var(--c-ink2); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--track-caps); }
+.vu-readout .vu-num.is-clip { color: var(--c-accent); }
+
+/* On/off switch, and the whole panel is a click target. */
+.vu { cursor: pointer; position: relative; }
+.vu-switch {
+  align-self: center; font-size: var(--fs-xs); font-family: var(--font-mono);
+  padding: 0 var(--sp-2); min-height: 1.3rem; letter-spacing: 0.08em;
+  color: var(--c-ink2); background: var(--c-bg2);
+}
+.vu-switch.is-on { border-color: var(--c-accent2); color: var(--c-accent2); background: transparent; }
+.vu.is-off .vu-bar { opacity: 0.35; }
+.vu.is-off .vu-label, .vu.is-off .vu-readout { opacity: 0.5; }
+
+/* Compact variant: lives in the transport bar, so it must stay short. The
+   per-column captions are dropped here: illegible at this size and the L/R/GR
+   order is self-evident from the full meter on the FX/MASTER tab. */
+.vu-compact {
+  align-items: stretch; gap: var(--sp-2); padding: var(--sp-2);
+}
+.vu-compact .vu-cluster { gap: var(--sp-1); align-items: stretch; }
+.vu-compact .vu-col { gap: 0; }
+.vu-compact .vu-bar { width: 0.42rem; height: auto; flex: 1; }
+.vu-compact .vu-label { display: none; }
+.vu-compact .vu-readout {
+  font-size: var(--fs-xs); min-width: 4.2rem; justify-content: center; gap: 0;
+}
+.vu-compact .vu-switch { align-self: center; }
+
+/* ── Library ──────────────────────────────────────────────────────────── */
+.lib-cats { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.lib-list { display: flex; flex-direction: column; gap: var(--sp-1); }
+.lib-item {
+  display: flex; align-items: center; gap: var(--sp-2);
+  border: var(--bw) solid transparent; border-radius: var(--r-s);
+  padding: var(--sp-2) var(--sp-3); min-height: 2.1rem; cursor: pointer;
+  transition: background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.lib-item:hover { background: var(--c-bg2); }
+.lib-item.is-cur { border-color: var(--c-accent2); background: var(--c-bg2); }
+.lib-item .l-name { flex: 1; }
+.lib-item .l-tags { color: var(--c-ink2); font-size: var(--fs-xs); font-family: var(--font-mono); }
+/* Small square secondary actions on a library row (lore ⓘ, sample remove). */
+.lib-item .l-info, .lib-item .l-x {
+  min-width: 1.7rem; min-height: 1.7rem; padding: 0 var(--sp-1);
+  font-size: var(--fs-xs); font-family: var(--font-mono);
+}
+/* Lore panel: sits under its item in the list, reads as a footnote. */
+.lib-info {
+  border-left: calc(2 * var(--bw)) solid var(--c-accent2-soft);
+  background: var(--c-bg2); border-radius: var(--r-s);
+  margin: 0 0 var(--sp-1) var(--sp-3);
+  padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.lib-info p { color: var(--c-ink1); font-size: var(--fs-s); }
+.lib-info .li-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); }
+.lib-info .li-term {
+  font-size: var(--fs-xs); font-family: var(--font-mono);
+  min-height: 1.5rem; padding: 0 var(--sp-2);
+  background: var(--c-bg0); color: var(--c-accent2); border-color: var(--c-line);
+}
+.lib-info .li-term:hover { border-color: var(--c-accent2); }
+.lib-info .li-wiki { margin-left: auto; font-size: var(--fs-xs); }
+/* Demo cards, compact: title and actions share a row, blurb tucks under,
+   freeing the vertical space the sample importer now uses. */
+.demo-card {
+  border: var(--bw) solid var(--c-hair); border-radius: var(--r-m);
+  background: var(--c-glass2);
+  padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1);
+  transition: border-color var(--dur-2) var(--ease);
+}
+.demo-card:hover { border-color: var(--c-hair-strong); }
+.demo-card strong { font-weight: 600; letter-spacing: 0.02em; }
+.demo-card .d-head { display: flex; align-items: center; gap: var(--sp-2); }
+.demo-card .d-head .grow { flex: 1; }
+.demo-card .d-head button { font-size: var(--fs-xs); min-height: 1.6rem; padding: 0 var(--sp-2); }
+.demo-card .d-desc { color: var(--c-ink1); font-size: var(--fs-s); }
+
+/* ── Modals (lessons, glossary, export) ───────────────────────────────── */
+.modal-back {
+  position: fixed; inset: 0; z-index: 50;
+  background: var(--c-scrim);
+  backdrop-filter: blur(calc(var(--blur) / 2)); -webkit-backdrop-filter: blur(calc(var(--blur) / 2));
+  display: flex; align-items: center; justify-content: center; padding: var(--sp-4);
+  animation: modal-in var(--dur-2) var(--ease);
+}
+@keyframes modal-in { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--c-bg1);
+  border: var(--bw) solid var(--c-hair-strong);
+  border-radius: var(--r-l); box-shadow: var(--sh-2);
+  width: min(46rem, 100%); max-height: 88vh;
+  display: flex; flex-direction: column;
+}
+.modal.modal-sm { width: min(30rem, 100%); }
+.modal-body p { color: var(--c-ink1); }
+/* Destructive confirm action */
+.btn-danger { border-color: var(--c-accent); color: var(--c-accent); background: transparent; }
+.btn-danger:hover { background: var(--c-accent-soft); color: var(--c-ink0); }
+.modal-head {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); min-height: 3.2rem;
+  border-bottom: var(--bw) solid var(--c-seam);
+}
+.modal-head h2 { flex: 1; min-width: 0; letter-spacing: 0.02em; }
+.modal-head .grow { flex: 1; }
+.modal-body { padding: var(--sp-4); overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-3); }
+.modal-foot {
+  display: flex; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4);
+  min-height: 3.2rem; border-top: var(--bw) solid var(--c-seam); align-items: center;
+}
+.modal-foot .grow { flex: 1; }
+
+/* Lessons */
+.lesson-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+.lesson-item {
+  display: flex; gap: var(--sp-3); align-items: baseline;
+  border: var(--bw) solid var(--c-hair); border-radius: var(--r-m);
+  background: var(--c-glass2);
+  padding: var(--sp-4); cursor: pointer;
+  transition: background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.lesson-item:hover { background: var(--c-bg2); border-color: var(--c-accent); }
+.lesson-item .num { font-family: var(--font-mono); color: var(--c-accent); font-size: var(--fs-l); }
+.lesson-item .blurb { color: var(--c-ink1); font-size: var(--fs-s); }
+.lesson-step-text { color: var(--c-ink0); }
+.lesson-demo {
+  border: var(--bw) dashed var(--c-line); border-radius: var(--r-m);
+  background: var(--c-bg0);
+  padding: var(--sp-4); display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center;
+}
+/* Lesson faders get a longer throw: the sweep is the point of the exercise. */
+.lesson-demo .fader-h .f-track { width: 9rem; }
+.lesson-dots { display: flex; gap: var(--sp-1); }
+.lesson-dots .dot { width: var(--sp-2); height: var(--sp-2); border-radius: 50%; background: var(--c-line); transition: background var(--dur-2) var(--ease); }
+.lesson-dots .dot.is-cur { background: var(--c-accent); }
+.mini-grid { display: flex; gap: var(--cell-gap); }
+
+/* Glossary */
+.gloss-list dt { color: var(--c-accent2); margin-top: var(--sp-3); font-weight: 600; }
+.gloss-list dd { color: var(--c-ink1); font-size: var(--fs-s); margin-left: 0; }
+
+/* Export */
+.exp-row { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
+.exp-note { color: var(--c-warn); font-size: var(--fs-s); }
+.exp-ok { color: var(--c-ok); font-size: var(--fs-s); }
+.exp-log { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--c-ink2); white-space: pre-wrap; }
+
+/* ── Tooltip ──────────────────────────────────────────────────────────── */
+.tooltip {
+  position: fixed; z-index: 200; pointer-events: none;
+  max-width: 20rem;
+  background: var(--c-bg1);
+  color: var(--c-ink0);
+  border: var(--bw) solid var(--c-hair-strong); border-radius: var(--r-m);
+  box-shadow: var(--sh-2);
+  padding: var(--sp-3); font-size: var(--fs-s); display: none;
+}
+.tooltip .tt-what { color: var(--c-ink0); }
+.tooltip .tt-why { color: var(--c-ink1); margin-top: var(--sp-1); font-size: var(--fs-xs); }
+
+/* ── Toast ────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: var(--sp-5); left: 50%; transform: translateX(-50%);
+  z-index: 90; background: var(--c-bg1);
+  border: var(--bw) solid var(--c-accent2);
+  border-radius: var(--r-m); padding: var(--sp-3) var(--sp-4); box-shadow: var(--sh-2);
+  font-size: var(--fs-s);
+  animation: toast-in var(--dur-2) var(--ease);
+}
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, var(--sp-3)); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ── Reduced motion: kill nonessential movement, keep state legible ────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; animation-iteration-count: 1 !important; }
+  .vu-fill, .vu-peak { transition: none; }
+  /* The meter parks itself in its off state under reduced motion (meter.js). */
+}

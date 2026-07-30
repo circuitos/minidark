@@ -1,0 +1,188 @@
+#!/usr/bin/env node
+/* smoke.mjs — headless run of the app's logic (dearest gate, runs last).
+   Zero dependencies: exercises DSP math, full sequencer scheduling of all
+   three demo songs (with a stubbed synth), and the WAV encoder. The full
+   audio path needs a browser; that is covered manually / pre-merge, not here. */
+import { loadSandbox, ENGINE_FILES } from "./mds-sandbox.mjs";
+
+let failures = 0;
+const fail = (msg) => { failures++; console.error("FAIL  " + msg); };
+const ok = (msg) => console.log("ok    " + msg);
+const assert = (cond, msg) => { if (!cond) fail(msg); };
+
+const sandbox = loadSandbox([...ENGINE_FILES, "js/engine/sequencer.js", "js/engine/export.js"]);
+const MDS = sandbox.MDS;
+
+/* ── DSP math ──────────────────────────────────────────────────────────── */
+const dsp = MDS.dsp;
+assert(Math.abs(dsp.midiToFreq(69) - 440) < 1e-9, "midiToFreq(69) !== 440");
+assert(dsp.noteName(69) === "A4", `noteName(69) = ${dsp.noteName(69)}`);
+for (const key of Object.keys(dsp.KEY_TO_PC)) {
+  for (let n = 30; n < 90; n += 7) {
+    const s = dsp.snapToScale(n, key);
+    const rel = (((s - dsp.KEY_TO_PC[key]) % 12) + 12) % 12;
+    assert(dsp.MINOR.includes(rel), `snapToScale(${n}, ${key}) = ${s} not in scale`);
+    assert(Math.abs(s - n) <= 2, `snapToScale(${n}, ${key}) moved ${Math.abs(s - n)} semitones`);
+  }
+}
+assert(dsp.distCurve(0.5).length === 2048, "distCurve length");
+const crush = dsp.crushCurve(4);
+assert(new Set(crush).size <= 17, `crushCurve(4) has ${new Set(crush).size} levels (want ≤ 2^4+1)`);
+ok("dsp: tuning, scale lock, curves");
+
+/* ── Karplus-Strong string (the guitar engine's sample generator) ──────── */
+{
+  const SR = 44100;
+  const p = { decay: 0.6, bright: 0.8, pick: 0.4 };
+  const a = dsp.karplus(SR, 110, p);
+  // ArrayBuffer.isView, not instanceof: the sandbox realm has its own Float32Array
+  assert(ArrayBuffer.isView(a) && a.length > SR, `karplus length ${a.length}`);
+  let finite = true, peak = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (!Number.isFinite(a[i])) { finite = false; break; }
+    if (Math.abs(a[i]) > peak) peak = Math.abs(a[i]);
+  }
+  assert(finite, "karplus produced non-finite samples");
+  assert(peak > 0.9 && peak <= 1.0001, `karplus peak ${peak} (want normalized)`);
+  const rms = (from, to) => {
+    let s = 0;
+    for (let i = from; i < to; i++) s += a[i] * a[i];
+    return Math.sqrt(s / (to - from));
+  };
+  const head = rms(0, Math.floor(a.length * 0.1));
+  const tail = rms(Math.floor(a.length * 0.9), a.length);
+  assert(tail < head * 0.2, `karplus does not decay (head ${head}, tail ${tail})`);
+  // deterministic: exports must be bit-identical run to run
+  const b = dsp.karplus(SR, 110, p);
+  let same = a.length === b.length;
+  for (let i = 0; same && i < a.length; i++) if (a[i] !== b[i]) same = false;
+  assert(same, "karplus is not deterministic");
+  // muted string dies much faster than an open one
+  assert(dsp.karplus(SR, 110, { decay: 0.05, bright: 0.5, pick: 0.3 }).length <
+         dsp.karplus(SR, 110, { decay: 0.95, bright: 0.5, pick: 0.3 }).length,
+    "karplus decay does not scale ring length");
+  ok("dsp: karplus string is pitched noise that decays, deterministically");
+}
+
+/* ── sequencer scheduling over all demo songs (stubbed synth) ──────────── */
+let triggers = 0;
+sandbox.MDS.synth = {
+  trigger(g, ti, patch, opts) {
+    triggers++;
+    assert(Number.isFinite(opts.time), "trigger with non-finite time");
+    assert(Number.isFinite(opts.dur) && opts.dur > 0, "trigger with bad duration");
+    assert(patch && patch.engine, "trigger without patch engine");
+    assert(opts.vel > 0 && opts.vel <= 1, `trigger with vel ${opts.vel}`);
+  },
+};
+for (const id of MDS.demos.ids()) {
+  const p = MDS.demos.make(id);
+  const sDur = 60 / p.bpm / 4;
+  const lastNotes = new Array(8).fill(null);
+  const before = triggers;
+  p.song.forEach((pIdx, bar) => {
+    for (let s = 0; s < 16; s++) {
+      const t = (bar * 16 + s) * sDur + (s % 2 ? p.swing * sDur * 0.5 : 0);
+      MDS.seq.scheduleStep(null, p, pIdx, s, t, sDur, lastNotes);
+    }
+  });
+  const n = triggers - before;
+  assert(n >= p.song.length * 4, `demo "${id}" scheduled only ${n} notes over ${p.song.length} bars`);
+  ok(`sequencer: demo "${id}" scheduled ${n} notes across ${p.song.length} bars without error`);
+}
+
+/* ── note length: cell.len scales the scheduled duration ───────────────── */
+{
+  const seen = [];
+  const stub = sandbox.MDS.synth;
+  sandbox.MDS.synth = { trigger: (g, ti, patch, opts) => seen.push(opts) };
+  const p = MDS.state.defaultProject();
+  const PAD = 6;
+  p.patterns[0].steps[PAD][0] = { on: true, acc: false, note: 57, len: 8 };
+  p.patterns[0].steps[PAD][8] = { on: true, acc: false, note: 57 };
+  const sDur = 60 / p.bpm / 4, gate = p.tracks[PAD].gate;
+  for (let s = 0; s < 16; s++) MDS.seq.scheduleStep(null, p, 0, s, s * sDur, sDur, null);
+  assert(seen.length === 2, `pad row scheduled ${seen.length} notes (want 2)`);
+  assert(Math.abs(seen[0].dur - sDur * gate * 8) < 1e-9, `len:8 note lasted ${seen[0].dur}s`);
+  assert(Math.abs(seen[1].dur - sDur * gate) < 1e-9, `note without len lasted ${seen[1].dur}s`);
+  // The reason len exists at all: a pad's attack outlives a single 16th.
+  assert(seen[0].dur > p.tracks[PAD].patch.a, "held pad note is shorter than its own attack");
+  sandbox.MDS.synth = stub;
+  ok("sequencer: cell.len scales note duration (a held pad outlasts its attack)");
+}
+
+/* ── randomizer stays inside what the voices can render ────────────────── */
+{
+  let rolls = 0, changed = 0;
+  for (const e of MDS.SOUND_LIBRARY) {
+    const base = MDS.lib.materialize(e.id);
+    if (!base || base.engine === "buffer") continue;
+    for (let i = 0; i < 200; i++) {
+      const before = JSON.stringify(base);
+      const p = MDS.state.rollPatch(JSON.parse(before));
+      rolls++;
+      if (JSON.stringify(p) !== before) changed++;
+      assert(p.engine === base.engine, `roll changed the engine of "${e.id}"`);
+      if (base.kind) assert(p.kind === base.kind, `roll changed the drum kind of "${e.id}"`);
+      for (const [k, v] of Object.entries(p)) {
+        if (typeof v !== "number") continue;
+        assert(Number.isFinite(v) && v >= -24 && v <= 12000, `roll of "${e.id}" gave ${k} = ${v}`);
+      }
+      // never silent, never slammed into the limiter
+      assert(p.gain > 0.3 && p.gain <= 1.1, `roll of "${e.id}" gave gain ${p.gain}`);
+      if (p.a != null) assert(p.a > 0 && p.a <= 1.2, `roll of "${e.id}" gave attack ${p.a}s`);
+    }
+  }
+  assert(changed / rolls > 0.99, `only ${changed} of ${rolls} rolls changed the patch`);
+  ok(`randomizer: ${rolls} rolls stay in range, engine and drum kind preserved`);
+}
+
+/* ── imported samples: registry + project-file round trip ──────────────── */
+{
+  const S = MDS.state;
+  const rec = S.addSample({ name: "door slam", mime: "audio/wav", data: "AAAA", secs: 0.5 });
+  assert(/^u\d+$/.test(rec.id), `sample id "${rec.id}" unexpected`);
+  assert(MDS.lib.get(rec.id) && MDS.lib.get(rec.id).name === "door slam", "sample not registered in library");
+  const patch = MDS.lib.materialize(rec.id);
+  assert(patch && patch.engine === "buffer", "sample does not materialize as a buffer patch");
+  const json = S.toJSON();
+  S.removeSample(rec.id);
+  assert(!MDS.lib.get(rec.id), "removeSample left the registry entry behind");
+  S.loadJSON(json);
+  assert(S.samples.length === 1 && MDS.lib.get(rec.id), "samples did not survive a save/load round trip");
+  const rec2 = S.addSample({ name: "second", mime: "audio/wav", data: "AAAA", secs: 0.1 });
+  assert(rec2.id !== rec.id, "sample ids collide after a project load");
+  S.removeSample(rec.id); S.removeSample(rec2.id);
+  assert(!JSON.parse(S.toJSON()).project.samples, "samples leaked into project (would bloat every undo snapshot)");
+  ok("samples: register, materialize, save/load round trip, ids never collide");
+}
+
+/* ── export tail follows the last bar's slowest release ────────────────── */
+{
+  const p = MDS.state.defaultProject();
+  assert(Math.abs(MDS.exporter.tailSecs(p, 0) - MDS.exporter.TAIL) < 1e-9,
+    "empty last bar should keep the base tail");
+  p.patterns[0].steps[6][0] = { on: true, acc: false, note: 57, len: 16 }; // pad row: padWarm r=0.9
+  const t = MDS.exporter.tailSecs(p, 0);
+  assert(Math.abs(t - (MDS.exporter.TAIL + 0.9 * 4)) < 1e-9, `pad in last bar gave tail ${t}s`);
+  ok("export: tail extends for what still rings in the final bar");
+}
+
+/* ── WAV encoder against a fake AudioBuffer ────────────────────────────── */
+const N = 44100;
+const chan = new Float32Array(N);
+for (let i = 0; i < N; i++) chan[i] = Math.sin((2 * Math.PI * 220 * i) / N);
+const fakeBuffer = { numberOfChannels: 2, length: N, sampleRate: 44100, duration: 1, getChannelData: () => chan };
+const blob = MDS.exporter.encodeWav(fakeBuffer);
+assert(blob.size === 44 + N * 4, `WAV size ${blob.size} (want ${44 + N * 4})`);
+const head = Buffer.from(await blob.slice(0, 12).arrayBuffer());
+assert(head.toString("ascii", 0, 4) === "RIFF" && head.toString("ascii", 8, 12) === "WAVE", "WAV header magic");
+ok("export: WAV encoder produces a valid 16-bit/44.1kHz RIFF");
+
+/* ── filename slugging ─────────────────────────────────────────────────── */
+const fn = MDS.exporter.filename({ name: "My Track!!" }, "wav");
+assert(/^my-track-\d{8}\.wav$/.test(fn), `filename "${fn}" unexpected`);
+ok("export: filenames slug cleanly");
+
+if (failures) { console.error(`\nsmoke: ${failures} failure(s)`); process.exit(1); }
+console.log("\nsmoke: all good");

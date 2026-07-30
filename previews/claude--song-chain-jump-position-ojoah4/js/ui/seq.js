@@ -1,0 +1,584 @@
+/* ============================================================================
+   ███ UI ███  seq.js — transport bar, 8×16 step grid, pattern bank, song
+   chain editor, and the rAF playhead fed by the engine's tick queue.
+   All strings from CONTENT, all styling via tokens/semantic classes.
+   ========================================================================== */
+window.MDS = window.MDS || {};
+MDS.ui = MDS.ui || {};
+
+MDS.ui.seq = (function () {
+  "use strict";
+  const C = () => MDS.CONTENT;
+  const S = () => MDS.state;
+
+  let els = {};       // named DOM handles
+  let cells = [];     // cells[track][step]
+  let lastPlayCol = -1;
+
+  /* ── Transport ─────────────────────────────────────────────────────── */
+  function buildTransport(root) {
+    const c = C().transport;
+    root.className = "transport";
+
+    const play = document.createElement("button");
+    play.className = "t-btn"; play.dataset.tt = "play";
+    const playIcon = document.createElement("span");
+    playIcon.className = "t-icon";
+    const playLabel = document.createElement("span");
+    playLabel.textContent = c.play;
+    play.append(playIcon, playLabel);
+    play.onclick = () => { S().ensureAudio(); MDS.seq.toggle(); };
+    els.play = play; els.playLabel = playLabel;
+
+    const pos = document.createElement("span");
+    pos.className = "pos-readout"; els.pos = pos;
+
+    /* Global output level plus the live VU, grouped at the right end of the
+       transport so level and metering read together. */
+    const vol = MDS.ui.fader({
+      label: C().fx.mVol, tip: "mVol",
+      min: 0, max: 1, value: S().project.master.vol,
+      fmt: (v) => Math.round(v * 100) + "%",
+      onInput: (v) => { S().project.master.vol = v; S().applyAudio(); MDS.bus.emit("master"); },
+    });
+    els.masterVol = vol;
+    const outGroup = document.createElement("div");
+    outGroup.className = "out-group";
+    outGroup.appendChild(vol.el);
+    if (MDS.ui.meter) outGroup.appendChild(MDS.ui.meter.create({ compact: true }));
+
+    const tempo = MDS.ui.knob({
+      label: c.tempo, tip: "tempo", min: 60, max: 180, value: S().project.bpm,
+      fmt: (v) => Math.round(v) + " BPM",
+      onInput: (v) => { S().project.bpm = Math.round(v); S().applyAudio(); },
+    });
+    els.tempo = tempo;
+
+    const swing = MDS.ui.knob({
+      label: c.swing, tip: "swing", min: 0, max: 0.6, value: S().project.swing,
+      fmt: (v) => Math.round(v * 100) + "%",
+      onInput: (v) => { S().project.swing = v; },
+    });
+    els.swing = swing;
+
+    const keyWrap = document.createElement("label");
+    keyWrap.className = "tbgroup"; keyWrap.dataset.tt = "key";
+    const keyLbl = document.createElement("span"); keyLbl.textContent = c.key;
+    const keySel = document.createElement("select");
+    for (const k of Object.keys(MDS.dsp.KEY_TO_PC)) {
+      const o = document.createElement("option"); o.value = k; o.textContent = k + "m";
+      keySel.appendChild(o);
+    }
+    keySel.value = S().project.key;
+    keySel.onchange = () => { S().project.key = keySel.value; MDS.bus.emit("sel"); };
+    keyWrap.append(keyLbl, keySel);
+    els.keySel = keySel;
+
+    const lock = document.createElement("button");
+    lock.dataset.tt = "scaleLock"; lock.textContent = c.scaleLock;
+    const syncLock = () => lock.classList.toggle("is-on", S().project.scaleLock);
+    lock.onclick = () => { S().project.scaleLock = !S().project.scaleLock; syncLock(); MDS.bus.emit("sel"); };
+    els.lockBtn = lock; els.syncLock = syncLock;
+
+    const modeWrap = document.createElement("span");
+    modeWrap.className = "tbgroup"; modeWrap.dataset.tt = "mode";
+    const mPat = document.createElement("button"); mPat.textContent = c.modePattern;
+    const mSong = document.createElement("button"); mSong.textContent = c.modeSong;
+    const syncMode = () => {
+      mPat.classList.toggle("is-on", S().playMode === "pattern");
+      mSong.classList.toggle("is-on", S().playMode === "song");
+    };
+    mPat.onclick = () => { S().playMode = "pattern"; syncMode(); };
+    mSong.onclick = () => { S().playMode = "song"; syncMode(); };
+    modeWrap.append(mPat, mSong);
+    els.syncMode = syncMode;
+
+    const spacer = document.createElement("span");
+    spacer.className = "grow";
+    /* Grouped into equal-height cells with hairline separators so every
+       control sits on one rhythm instead of floating at its own height. */
+    const cell = (...kids) => MDS.ui.cell("tp-cell", ...kids);
+    root.append(
+      cell(play, pos),
+      cell(tempo.el, swing.el),
+      cell(keyWrap, lock),
+      cell(modeWrap),
+      spacer,
+      outGroup
+    );
+    syncLock(); syncMode();
+  }
+
+  /* ── Step grid ─────────────────────────────────────────────────────── */
+  function trackIsMelodic(ti) {
+    const p = S().project.tracks[ti].patch;
+    return p && p.engine !== "drum";
+  }
+
+  function buildGrid(root) {
+    root.innerHTML = "";
+    root.className = "seq-box";
+
+    const head = document.createElement("div");
+    head.className = "seq-head";
+    const title = document.createElement("h3"); title.textContent = C().seq.patterns;
+    const bank = document.createElement("div");
+    bank.className = "pat-bank"; bank.dataset.tt = "patternBank";
+    els.bankBtns = [];
+    for (let i = 0; i < 8; i++) {
+      const b = document.createElement("button");
+      b.textContent = String(i + 1);
+      b.onclick = () => { S().sel.pattern = i; MDS.bus.emit("sel"); };
+      bank.appendChild(b); els.bankBtns.push(b);
+    }
+    const cp = document.createElement("button"); cp.textContent = C().seq.copy; cp.dataset.tt = "patCopy";
+    cp.onclick = () => { S().clipboard = JSON.parse(JSON.stringify(S().project.patterns[S().sel.pattern])); };
+    const pst = document.createElement("button"); pst.textContent = C().seq.paste; pst.dataset.tt = "patPaste";
+    pst.onclick = () => {
+      if (!S().clipboard) return;
+      S().project.patterns[S().sel.pattern] = JSON.parse(JSON.stringify(S().clipboard));
+      MDS.bus.emit("pattern");
+    };
+    const clr = document.createElement("button"); clr.textContent = C().seq.clear; clr.dataset.tt = "patClear";
+    clr.onclick = () => { S().project.patterns[S().sel.pattern] = S().emptyPattern(); MDS.bus.emit("pattern"); };
+    /* Same cell rhythm as the transport: label, bank, edit actions. */
+    const hCell = (...kids) => MDS.ui.cell("hd-cell", ...kids);
+    head.append(hCell(title), hCell(bank), hCell(cp, pst, clr));
+
+    const scroll = document.createElement("div");
+    scroll.className = "grid-scroll";
+    const grid = document.createElement("div");
+    grid.className = "grid"; grid.dataset.tt = "stepGrid";
+    cells = [];
+    els.rowHeads = [];
+    for (let ti = 0; ti < 8; ti++) {
+      const row = document.createElement("div");
+      row.className = "grid-row";
+      row.style.setProperty("--row-hue", `var(--track-${ti})`);
+
+      const rh = document.createElement("div");
+      rh.className = "row-head"; rh.dataset.tt = "trackSelect";
+      const led = document.createElement("span"); led.className = "led";
+      const nm = document.createElement("span");
+      nm.textContent = C().tracks[S().TRACK_DEFS[ti].key];
+      const mute = document.createElement("button");
+      mute.className = "mini"; mute.textContent = C().mixer.mute; mute.dataset.tt = "trackMuteMini";
+      mute.onclick = (e) => { e.stopPropagation(); const t = S().project.tracks[ti]; t.mute = !t.mute; S().applyMixer(); MDS.bus.emit("mix"); };
+      const solo = document.createElement("button");
+      solo.className = "mini"; solo.textContent = C().mixer.solo; solo.dataset.tt = "trackMuteMini";
+      solo.onclick = (e) => { e.stopPropagation(); const t = S().project.tracks[ti]; t.solo = !t.solo; S().applyMixer(); MDS.bus.emit("mix"); };
+      rh.append(led, nm, mute, solo);
+      rh.onclick = () => {
+        // Selecting a row moves the keyboard and the panel, NOT the note you
+        // last chose: picking the row you want to write on must not silently
+        // throw that choice away.
+        S().sel.track = ti;
+        MDS.bus.emit("sel");
+      };
+      els.rowHeads.push({ rh, mute, solo });
+      row.appendChild(rh);
+
+      const rowCells = [];
+      for (let si = 0; si < 16; si++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.ti = String(ti); cell.dataset.si = String(si);
+        if (si % 4 === 0 && si !== 0) cell.dataset.beat = "1";
+        row.appendChild(cell);
+        rowCells.push(cell);
+      }
+      cells.push(rowCells);
+      grid.appendChild(row);
+    }
+    /* One delegated listener set per gesture instead of 4 closures on each
+       of the 128 cells; the len-drag already reads dataset the same way.
+       Row heads inside the grid have no .cell ancestor, so they fall through
+       to their own handlers untouched. */
+    const cellFrom = (e) => {
+      const el = e.target.closest && e.target.closest(".cell");
+      return el ? { ti: +el.dataset.ti, si: +el.dataset.si } : null;
+    };
+    grid.addEventListener("pointerdown", (e) => {
+      const c = cellFrom(e);
+      if (c && e.button === 0) startLenDrag(c.ti, c.si);
+    });
+    grid.addEventListener("click", (e) => {
+      const c = cellFrom(e);
+      if (!c || dragMoved) return;            // the drag already edited this note
+      if (e.shiftKey && trackIsMelodic(c.ti)) { growLen(c.ti, c.si); return; }
+      toggleCell(c.ti, c.si);
+    });
+    grid.addEventListener("contextmenu", (e) => {
+      const c = cellFrom(e);
+      if (!c) return;
+      e.preventDefault(); accentCell(c.ti, c.si);
+    });
+    grid.addEventListener("wheel", (e) => {
+      const c = cellFrom(e);
+      if (!c) return;
+      e.preventDefault(); nudgeNote(c.ti, c.si, e.deltaY < 0 ? 1 : -1);
+    }, { passive: false });
+    scroll.appendChild(grid);
+
+    /* Per-column step LEDs above the grid, aligned to the cell rhythm. */
+    const leds = document.createElement("div");
+    leds.className = "col-leds";
+    els.colLeds = [];
+    for (let si = 0; si < 16; si++) {
+      const d = document.createElement("span");
+      d.className = "col-led";
+      if (si % 4 === 0) d.dataset.beat = "1";
+      if (si % 4 === 0 && si !== 0) d.dataset.gap = "1";
+      leds.appendChild(d); els.colLeds.push(d);
+    }
+    scroll.insertBefore(leds, grid);
+
+    const help = document.createElement("div");
+    help.className = "seq-help";
+    help.textContent = C().seq.help;
+
+    root.append(head, scroll, help);
+  }
+
+  function cellAt(ti, si) { return S().project.patterns[S().sel.pattern].steps[ti][si]; }
+
+  /* Pitch written into a step that has none yet: the last note chosen ON THAT
+     ROW, on the keyboard or with the wheel (state.js owns the rule). */
+  function entryNote(ti) {
+    return maybeSnap(S().entryNote(ti));
+  }
+
+  function toggleCell(ti, si) {
+    const cell = cellAt(ti, si);
+    cell.on = !cell.on;
+    if (cell.on && trackIsMelodic(ti) && cell.note == null) cell.note = entryNote(ti);
+    MDS.bus.emit("pattern");
+  }
+
+  /* ── Note length ───────────────────────────────────────────────────────
+     A cell's `len` (see the schema in state.js) is what lets slow sounds
+     speak: a pad with a 600 ms attack never opens inside one 16th. Drag
+     right from a step to hold it over several, shift-click to grow by one.
+     Lengths clamp to the end of the bar and only apply to melodic rows. */
+  let drag = null;        // { ti, si, len } anchor of an in-progress drag
+  let dragMoved = false;  // true once a drag edited; swallows the click after it
+
+  function setLen(ti, si, len) {
+    const cell = cellAt(ti, si);
+    const n = Math.max(1, Math.min(16 - si, len));
+    if (!cell.on) {
+      cell.on = true;
+      if (cell.note == null) cell.note = entryNote(ti);
+    }
+    cell.len = n;
+    MDS.bus.emit("pattern");
+  }
+
+  function growLen(ti, si) {
+    const cell = cellAt(ti, si);
+    setLen(ti, si, cell.on ? (cell.len || 1) + 1 : 1);
+  }
+
+  function startLenDrag(ti, si) {
+    dragMoved = false;
+    if (!trackIsMelodic(ti)) return;
+    const cell = cellAt(ti, si);
+    drag = { ti, si, len: cell.on ? (cell.len || 1) : 1 };
+    document.addEventListener("pointermove", onLenDrag);
+    document.addEventListener("pointerup", endLenDrag);
+    document.addEventListener("pointercancel", endLenDrag);
+  }
+
+  /* elementFromPoint (not pointerenter) so a drag also tracks under touch,
+     where the pointer stays captured by the cell it started on. */
+  function onLenDrag(e) {
+    if (!drag) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || !el.classList.contains("cell")) return;
+    if (+el.dataset.ti !== drag.ti) return;
+    const len = +el.dataset.si - drag.si + 1;
+    if (len < 1 || len === drag.len) return;
+    drag.len = len;
+    dragMoved = true;
+    setLen(drag.ti, drag.si, len);
+  }
+
+  function endLenDrag() {
+    drag = null;
+    document.removeEventListener("pointermove", onLenDrag);
+    document.removeEventListener("pointerup", endLenDrag);
+    document.removeEventListener("pointercancel", endLenDrag);
+  }
+
+  function accentCell(ti, si) {
+    const cell = cellAt(ti, si);
+    if (!cell.on) { toggleCell(ti, si); }
+    cell.acc = !cell.acc;
+    MDS.bus.emit("pattern");
+  }
+
+  function nudgeNote(ti, si, dir) {
+    if (!trackIsMelodic(ti)) return;
+    const cell = cellAt(ti, si);
+    if (!cell.on) return;
+    let n = (cell.note == null ? S().project.tracks[ti].baseNote : cell.note) + dir;
+    if (S().project.scaleLock) {
+      // step through scale tones, not semitones
+      let guard = 0;
+      while (MDS.dsp.snapToScale(n, S().project.key) !== n && guard++ < 12) n += dir;
+    }
+    cell.note = Math.max(21, Math.min(108, n));
+    if (cell.notes) delete cell.notes; // editing the root dissolves authored chords
+    // Wheeling a step IS choosing a note: the next step you write gets it too.
+    S().setEntryNote(ti, cell.note);
+    MDS.bus.emit("pattern");
+    MDS.bus.emit("sel");
+  }
+
+  function maybeSnap(n) {
+    return S().project.scaleLock ? MDS.dsp.snapToScale(n, S().project.key) : n;
+  }
+
+  function refreshGrid() {
+    const pat = S().project.patterns[S().sel.pattern];
+    for (let ti = 0; ti < 8; ti++) {
+      const tr = S().project.tracks[ti];
+      const heads = els.rowHeads[ti];
+      heads.rh.classList.toggle("is-sel", S().sel.track === ti);
+      heads.mute.classList.toggle("is-on", tr.mute);
+      heads.solo.classList.toggle("is-on", tr.solo);
+      const melodic = trackIsMelodic(ti);
+      for (let si = 0; si < 16; si++) {
+        const cell = pat.steps[ti][si];
+        const el = cells[ti][si];
+        el.classList.toggle("is-on", !!cell.on);
+        el.classList.toggle("is-accent", !!(cell.on && cell.acc));
+        el.classList.remove("is-tail");   // recomputed from `len` below
+        if (cell.on && melodic && cell.note != null) {
+          el.textContent = MDS.dsp.noteName(cell.note) + (cell.notes && cell.notes.length > 1 ? "+" : "");
+        } else el.textContent = "";
+      }
+      // Held notes paint their extra steps as a tie bar, so `len` is visible.
+      if (melodic) {
+        for (let si = 0; si < 16; si++) {
+          const cell = pat.steps[ti][si];
+          if (!cell.on || !(cell.len > 1)) continue;
+          const end = Math.min(16, si + cell.len);
+          for (let k = si + 1; k < end; k++) {
+            if (!pat.steps[ti][k].on) cells[ti][k].classList.add("is-tail");
+          }
+        }
+      }
+    }
+    for (let i = 0; i < 8; i++) els.bankBtns[i].classList.toggle("is-cur", S().sel.pattern === i);
+  }
+
+  /* ── Song chain ────────────────────────────────────────────────────── */
+  function buildSong(root) {
+    root.innerHTML = "";
+    root.className = "seq-box song-box";
+    const head = document.createElement("div");
+    head.className = "song-head";
+    const title = document.createElement("h3"); title.textContent = C().seq.songTitle;
+    const add = document.createElement("button"); add.textContent = C().seq.songAdd; add.dataset.tt = "songAdd";
+    add.onclick = () => { S().project.song.push(S().sel.pattern); MDS.bus.emit("song"); };
+    const clear = document.createElement("button"); clear.textContent = C().seq.songClear; clear.dataset.tt = "songClear";
+    clear.onclick = () => { S().project.song.length = 0; MDS.bus.emit("song"); };
+    const len = document.createElement("span"); len.className = "seq-help"; els.songLen = len;
+    const hint = document.createElement("span");
+    hint.className = "seq-help is-right"; hint.textContent = C().seq.chipHint;
+    const sCell = (...kids) => MDS.ui.cell("hd-cell", ...kids);
+    head.append(sCell(title), sCell(add, clear), sCell(len), hint);
+    const chain = document.createElement("div");
+    chain.className = "chain"; chain.dataset.tt = "songChain";
+    els.chain = chain;
+    root.append(head, chain);
+  }
+
+  /* ── Song block drag (hold, then slide) ────────────────────────────────
+     A plain click still removes a block, so the grab has to arm on a HOLD:
+     that delay is the whole difference between "remove this" and "move
+     this". Moving before the hold lands cancels it, the way a long-press
+     should, so a scroll or a mis-swipe never picks a block up. */
+  const HOLD_MS = 500, HOLD_SLOP = 8;
+  let grab = null;         // { pos } chain index currently held
+  let grabTimer = null, grabFrom = null;
+  let grabbed = false;     // a grab happened: swallows the click after it
+
+  function armChipGrab(pos, e) {
+    clearGrabTimer();
+    grabbed = false;
+    grabFrom = { x: e.clientX, y: e.clientY };
+    grabTimer = setTimeout(() => {
+      grab = { pos };
+      grabbed = true;      // held long enough to mean "move", never "remove"
+      refreshSong();
+    }, HOLD_MS);
+    document.addEventListener("pointermove", onChipDrag);
+    document.addEventListener("pointerup", endChipGrab);
+    document.addEventListener("pointercancel", endChipGrab);
+  }
+
+  function onChipDrag(e) {
+    if (!grab) {
+      // still counting down: a real move means the user meant to scroll
+      if (Math.abs(e.clientX - grabFrom.x) > HOLD_SLOP ||
+          Math.abs(e.clientY - grabFrom.y) > HOLD_SLOP) clearGrabTimer();
+      return;
+    }
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const slot = el && el.closest ? el.closest(".chip-slot") : null;
+    if (!slot) return;
+    const to = +slot.dataset.pos;
+    const song = S().project.song;
+    if (!Number.isInteger(to) || to === grab.pos || to >= song.length) return;
+    song.splice(to, 0, song.splice(grab.pos, 1)[0]);
+    grab.pos = to;
+    MDS.bus.emit("song");
+  }
+
+  function clearGrabTimer() { clearTimeout(grabTimer); grabTimer = null; }
+
+  function endChipGrab() {
+    clearGrabTimer();
+    const held = !!grab;
+    grab = null;
+    document.removeEventListener("pointermove", onChipDrag);
+    document.removeEventListener("pointerup", endChipGrab);
+    document.removeEventListener("pointercancel", endChipGrab);
+    if (held) refreshSong();
+  }
+
+  /* Jump live playback to chain position `pos` (the ▶ cue under each chip).
+     Flips to SONG mode first (a song position is inaudible in pattern mode)
+     and starts the transport when it is not already running. */
+  function jumpToBar(pos) {
+    S().ensureAudio();
+    if (S().playMode !== "song") { S().playMode = "song"; els.syncMode(); }
+    MDS.seq.seekSong(pos);
+    if (!MDS.seq.playing) MDS.seq.start();
+  }
+
+  function refreshSong() {
+    const song = S().project.song;
+    els.chain.innerHTML = "";
+    if (!song.length) {
+      const e = document.createElement("span"); e.className = "seq-help";
+      e.textContent = C().seq.songEmpty;
+      els.chain.appendChild(e);
+    }
+    song.forEach((pIdx, i) => {
+      const slot = document.createElement("span");
+      slot.className = "chip-slot"; slot.dataset.pos = String(i);
+      const chip = document.createElement("span");
+      chip.className = "chip"; chip.textContent = String(pIdx + 1);
+      if (S().tipsOn !== false) chip.title = C().seq.chipHint; // native hover help obeys HINTS too
+      if (grab && grab.pos === i) chip.classList.add("is-grabbed");
+      chip.onpointerdown = (e) => { if (e.button === 0) armChipGrab(i, e); };
+      chip.onclick = (e) => {
+        // shift-click duplicates this slot in place; plain click removes it
+        if (grabbed) return;   // the hold already moved this block
+        if (e.shiftKey) song.splice(i + 1, 0, pIdx);
+        else song.splice(i, 1);
+        MDS.bus.emit("song");
+      };
+      // The jump cue is its OWN element under the chip, so it cannot collide
+      // with the chip's remove / duplicate / hold-to-drag gestures.
+      const jump = document.createElement("button");
+      jump.className = "chip-jump"; jump.dataset.tt = "songJump";
+      jump.textContent = C().seq.chipJump;
+      if (S().tipsOn !== false) jump.title = C().tooltips.songJump.what;
+      jump.onclick = () => jumpToBar(i);
+      slot.append(chip, jump);
+      els.chain.appendChild(slot);
+    });
+    const secs = Math.round(song.length * 16 * MDS.seq.stepDur(S().project));
+    els.songLen.textContent = C().seq.songLen(song.length, secs);
+  }
+
+  /* ── Playhead (rAF drains the engine's tick queue) ─────────────────── */
+  let lastPlaying = null;
+  function raf() {
+    requestAnimationFrame(raf);
+    const playing = MDS.seq.playing;
+    if (playing !== lastPlaying) {   // write the button only on transitions
+      lastPlaying = playing;
+      els.playLabel.textContent = playing ? C().transport.stop : C().transport.play;
+      els.play.classList.toggle("is-playing", playing);
+    }
+    if (!playing) {
+      if (lastPlayCol >= 0) { clearPlayCol(); lastPlayCol = -1; }
+      return;
+    }
+    const audio = S().audio;
+    if (!audio) return;
+    const ticks = MDS.seq.drainTicks(audio.ctx.currentTime);
+    if (!ticks.length) return;
+    const t = ticks[ticks.length - 1];
+    // Two-digit, tabular figures: the readout must not change width as it
+    // counts, or every control to its right in the transport shifts.
+    const pad = (n) => String(n).padStart(2, "0");
+    els.pos.textContent = `${C().transport.posBar} ${pad(t.songPos + 1)} · ${C().transport.posStep} ${pad(t.step + 1)}`;
+    // playhead column (only when the playing pattern is the one on screen)
+    clearPlayCol();
+    const showing = S().sel.pattern;
+    if (S().playMode === "pattern" || t.pIdx === showing) {
+      for (let ti = 0; ti < 8; ti++) cells[ti][t.step].classList.add("is-play");
+      lastPlayCol = t.step;
+    }
+    if (els.colLeds) {
+      for (let si = 0; si < 16; si++) els.colLeds[si].classList.toggle("is-lit", si === t.step);
+    }
+    for (let i = 0; i < 8; i++) els.bankBtns[i].classList.toggle("is-live", MDS.seq.playing && t.pIdx === i);
+    // highlight current song chip
+    if (S().playMode === "song") {
+      const chips = els.chain.querySelectorAll(".chip");
+      chips.forEach((ch, i) => ch.classList.toggle("is-play", i === t.songPos));
+    }
+  }
+
+  function clearPlayCol() {
+    if (els.colLeds) els.colLeds.forEach((d) => d.classList.remove("is-lit"));
+    if (lastPlayCol < 0) return;
+    for (let ti = 0; ti < 8; ti++) cells[ti][lastPlayCol].classList.remove("is-play");
+  }
+
+  /* ── Public init ───────────────────────────────────────────────────── */
+  function init(transportRoot, gridRoot, songRoot) {
+    buildTransport(transportRoot);
+    buildGrid(gridRoot);
+    buildSong(songRoot);
+    refreshGrid(); refreshSong();
+
+    /* sel fires for entry-note wheel ticks and key changes too; the grid only
+       shows sel.track (row highlight) and sel.pattern (bank), so a sel that
+       kept both skips the 128-cell repaint (the pattern event covers edits). */
+    let lastSelTrack = S().sel.track, lastSelPattern = S().sel.pattern;
+    MDS.bus.on("sel", () => {
+      els.syncLock();
+      if (S().sel.track === lastSelTrack && S().sel.pattern === lastSelPattern) return;
+      lastSelTrack = S().sel.track; lastSelPattern = S().sel.pattern;
+      refreshGrid();
+    });
+    MDS.bus.on("pattern", refreshGrid);
+    MDS.bus.on("mix", refreshGrid);
+    MDS.bus.on("song", refreshSong);
+    MDS.bus.on("tips", refreshSong);   // re-render chips so titles follow HINTS
+    // keep the transport volume in step with the FX/MASTER fader
+    MDS.bus.on("master", () => {
+      if (els.masterVol) els.masterVol.set(S().project.master.vol, false);
+    });
+    MDS.bus.on("project", () => {
+      lastSelTrack = S().sel.track; lastSelPattern = S().sel.pattern;
+      els.tempo.set(S().project.bpm, false);
+      els.swing.set(S().project.swing, false);
+      if (els.masterVol) els.masterVol.set(S().project.master.vol, false);
+      els.keySel.value = S().project.key;
+      els.syncLock(); els.syncMode();
+      refreshGrid(); refreshSong();
+    });
+    raf();
+  }
+
+  return { init };
+})();

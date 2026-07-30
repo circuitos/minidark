@@ -1,0 +1,181 @@
+/* ============================================================================
+   ███ THEME ███  DESIGN TOKENS — the ONLY place where colors, fonts, spacing,
+   radii, shadows and component visual parameters are defined. Components
+   (css/app.css, js/ui/*) reference these tokens exclusively.
+   ----------------------------------------------------------------------------
+   DESIGN PASS PLAN  ·  "IRON, machined" — flat instrument hardware
+   ----------------------------------------------------------------------------
+   Named values (the anchor palette):
+     #0c0d10  soot         canvas    — flat near-black, cool-neutral
+     #16171b  iron         panels    — flat modules split by dark seams
+     #e6e8ec  bone          text      — desaturated near-white, AA everywhere
+     #e0483c  ember         primary   — active states as thin OUTLINES, not fills
+     #45a7e6  signal-blue   secondary — value arcs, selection, focus
+     #e6b345  amber         warning   — sparse, never decorative
+
+   Look decision: physical but not skeuomorphic. No gradients, no glows, no
+   glass. Depth comes from exactly two devices: dark seams between flat panels,
+   and thin luminous value arcs on matte knob faces. Active toggles render as
+   ember OUTLINED chips (border + text, transparent fill), the signature move
+   of flat pro instrument UIs. Everything else is tone-on-tone charcoal.
+
+   Type roles: Barlow (self-hosted, DIN-flavored industrial sans) for all UI;
+   IBM Plex Mono (self-hosted) with tabular figures for every numeric readout.
+   Files in /fonts with OFL licenses; system stacks remain as fallback.
+
+   Layout concept: one machined slab: flat charcoal modules, tiny tracking-
+   spaced caps section labels, controls sitting directly on the panel with no
+   card chrome. Dense, quiet, generous hit targets.
+
+   Signature element (kept from v2): the master VU cluster on FX/MASTER,
+   read-only with real ballistics (js/ui/meter.js).
+   ========================================================================== */
+
+@font-face {
+  font-family: "Barlow";
+  src: url("../fonts/Barlow-Regular.ttf") format("truetype");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("../fonts/Barlow-Medium.ttf") format("truetype");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("../fonts/Barlow-SemiBold.ttf") format("truetype");
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../fonts/IBMPlexMono-Regular.ttf") format("truetype");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../fonts/IBMPlexMono-Medium.ttf") format("truetype");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+
+:root {
+  /* 1 ── Palette (flat machined charcoal; accents are thin, never washes) */
+  --c-bg0: #0c0d10;          /* app background (soot)             */
+  --c-bg1: #16171b;          /* panel background (iron)           */
+  --c-bg2: #1e2025;          /* raised surface / cells            */
+  --c-bg3: #282b32;          /* hover / active surface            */
+  --c-line: #2b2e35;         /* borders, separators               */
+  --c-edge: #6a6d75;         /* control edge: 3:1 vs control fill (WCAG 1.4.11) */
+  --c-seam: #08090b;         /* dark seams between modules        */
+  --c-ink0: #e6e8ec;         /* primary text                      */
+  --c-ink1: #9ba0aa;         /* secondary text                    */
+  --c-ink2: #767c88;         /* muted text / labels               */
+  --c-accent: #e0483c;       /* primary accent (play, active steps, alerts) */
+  --c-accent-soft: #6e2a24;  /* accent, dimmed                    */
+  --c-accent2: #45a7e6;      /* secondary accent (arcs, selection, focus) */
+  --c-accent2-soft: #234b63; /* secondary, dimmed                 */
+  --c-ok: #4cb96a;           /* success / power LED               */
+  --c-warn: #e6b345;         /* warnings / notices (amber)        */
+  --c-white: #ffffff;        /* highlight base only               */
+  --c-scrim: rgba(4, 5, 7, 0.78);  /* modal backdrop              */
+
+  /* Hairlines + textures (kept: subtle by definition) */
+  --c-glass2: #1a1c21;                   /* group fill            */
+  --c-hair: rgba(255, 255, 255, 0.055);  /* hairline border       */
+  --c-hair-strong: rgba(255, 255, 255, 0.12); /* lit hairline     */
+  --c-grid-line: rgba(255, 255, 255, 0.03);   /* signal grid      */
+  --blur: 12px;                          /* overlay blur only     */
+
+  /* 2 ── Track identity hues (row LEDs, playhead tint, mixer strips) */
+  --track-0: #e05545;  /* kick  */
+  --track-1: #e08a45;  /* snare */
+  --track-2: #d9c24a;  /* hat   */
+  --track-3: #8fce55;  /* perc  */
+  --track-4: #46c69b;  /* bass  */
+  --track-5: var(--c-accent2);  /* lead: deliberately the signal blue */
+  --track-6: #7d84e0;  /* pad   */
+  --track-7: #c264d9;  /* arp   */
+
+  /* 3 ── Typography (self-hosted; robust system fallbacks) */
+  --font-ui: "Barlow", "Helvetica Neue", Helvetica, "Segoe UI", system-ui, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --fs-xs: 0.68rem;
+  --fs-s: 0.78rem;
+  --fs-m: 0.9rem;
+  --fs-l: 1.05rem;
+  --fs-xl: 1.4rem;
+  --lh: 1.45;
+  --track-caps: 0.16em;      /* letter-spacing for all-caps module labels */
+
+  /* 4 ── Spacing scale */
+  --sp-1: 0.2rem;
+  --sp-2: 0.4rem;
+  --sp-3: 0.65rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2.2rem;
+
+  /* 5 ── Radii (tight: machined, not friendly-rounded) */
+  --r-s: 3px;
+  --r-m: 5px;
+  --r-l: 8px;
+
+  /* 6 ── Border width */
+  --bw: 1px;
+
+  /* 7 ── Shadows + motion (flat look: shadows are structural, not glowy) */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-2: 0 20px 50px -16px rgba(0, 0, 0, 0.75);
+  --sh-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --sh-inset-strong: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --sh-glow-accent: 0 0 0 var(--bw) rgba(224, 72, 60, 0.28);
+  --sh-glow-accent-strong: 0 0 0 var(--bw) rgba(224, 72, 60, 0.45);
+  --sh-glow-cyan: 0 0 0 var(--bw) rgba(69, 167, 230, 0.3);
+  --dur-1: 90ms;             /* micro (press/hover)   */
+  --dur-2: 150ms;            /* standard transition   */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* 8 ── Component metrics */
+  /* Knob visuals (read by js/ui/knob.js from these tokens; no colors in JS).
+     Flat matte face, thin luminous arc, thin pale pointer: no gradient. */
+  --knob-size: 46px;         /* outer diameter                       */
+  --knob-size-s: 34px;       /* small knob (mixer sends)             */
+  --knob-track: #24262c;     /* arc background stroke                */
+  --knob-fill: var(--c-accent2);  /* arc value stroke (signal blue)  */
+  --knob-pointer: #c9cdd4;   /* pointer line                         */
+  --knob-stroke-w: 3;        /* SVG stroke width (unitless, viewBox) */
+  --knob-body: #23252b;      /* knob face (matte)                    */
+
+  /* Sequencer grid */
+  --cell-w: 2.1rem;
+  --cell-h: 2.1rem;
+  --cell-gap: 0.24rem;
+  --cell-beat-gap: 0.6rem;   /* extra gap every 4 steps */
+  --rowhead-w: 6.6rem;       /* row-head width; the col-LED offset derives from it */
+
+  /* On-screen keyboard */
+  --kb-white-w: 2.6rem;
+  --kb-white-h: 6.2rem;
+  --kb-black-w: 1.6rem;
+  --kb-black-h: 3.8rem;
+
+  /* Master VU meter (signature; js/ui/meter.js). Derived tokens reference
+     their anchors so a retint follows automatically; --meter-lo's green
+     matches --track-4 by coincidence, not by reference. */
+  --meter-lo: #46c69b;       /* nominal level               */
+  --meter-mid: var(--c-warn);     /* hot level (amber)      */
+  --meter-hi: var(--c-accent);    /* peak / clip (ember)    */
+  --meter-off: rgba(255, 255, 255, 0.05);  /* unlit segment */
+  --meter-gr: var(--c-accent2);   /* gain-reduction fill    */
+  --meter-w: 0.85rem;        /* meter column width          */
+  --meter-h: 9rem;           /* meter column height         */
+
+  /* Layout */
+  --tp-h: 4.6rem;            /* transport control band height */
+  --hd-h: 2.4rem;            /* module header band height (seq, song, keyboard) */
+  --ctl-h: 4.6rem;           /* panel control-row band height */
+  --panel-w: 30rem;          /* right-hand panel width at laptop size */
+  --topbar-h: 3.4rem;
+  --maxw: 100rem;
+}
+
+/* Single dark theme by design (dark-synth studio). */
