@@ -102,7 +102,7 @@ MDS.dsp = (function () {
         const env = Math.pow(1 - t, 2.2 + size * 1.5);
         const a = 0.05 + (1 - tone) * 0.55 + t * 0.3; // more smoothing later + darker with low tone
         const src = noise[(i * (ch + 1) + ch * 7919) % noise.length];
-        lp += Math.min(1, 1 - a) * (src - lp);
+        lp += (1 - a) * (src - lp); // a is always >= 0.05, so 1-a needs no clamp
         d[i] = lp * env;
       }
       // tiny pre-delay of silence keeps the dry transient distinct
@@ -111,6 +111,61 @@ MDS.dsp = (function () {
     }
     byKey[key] = buf;
     return buf;
+  }
+
+  /* Karplus-Strong plucked string, rendered as raw samples (1983 algorithm:
+     a noise burst circulating through a delay line one period long, losing
+     treble on every pass, rings into a pitched string). Pure math so the
+     smoke test can run it in Node and offline renders stay bit-identical.
+     p: { decay 0..1 (ring time ~0.12–2.5 s), bright 0..1 (pick/tone),
+          pick 0..1 (pick-position comb) }.
+     Returns a Float32Array normalized to ±1. */
+  function karplus(sampleRate, freq, p) {
+    const decay = Math.min(1, Math.max(0, p.decay == null ? 0.6 : p.decay));
+    const bright = Math.min(1, Math.max(0, p.bright == null ? 0.7 : p.bright));
+    const pickPos = Math.min(1, Math.max(0, p.pick == null ? 0.4 : p.pick));
+
+    const f = Math.min(sampleRate / 6, Math.max(20, freq));
+    const D = sampleRate / f;                     // exact loop length (samples)
+    const N = Math.max(2, Math.floor(D - 0.5));   // integer part of the delay
+    const frac = Math.min(0.999, Math.max(0, D - N - 0.5)); // interp remainder
+
+    const secs = 0.12 + decay * 2.4;
+    const len = Math.ceil(sampleRate * secs);
+    const out = new Float32Array(len);
+
+    // Excitation: one period of deterministic noise (mulberry32, fixed seed),
+    // lowpassed by `bright`, comb-filtered by pick position.
+    let s = 0x1234567;
+    const rand = () => {
+      s |= 0; s = (s + 0x6d2b79f5) | 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+    };
+    const exLen = N + 2;
+    const k = 0.08 + bright * 0.88;               // one-pole coefficient
+    let lp = 0;
+    for (let i = 0; i < exLen && i < len; i++) {
+      lp += k * (rand() - lp);
+      out[i] = lp;
+    }
+    const comb = Math.max(1, Math.round(N * (0.08 + pickPos * 0.42)));
+    for (let i = Math.min(exLen, len) - 1; i >= comb; i--) out[i] -= 0.9 * out[i - comb];
+
+    // String loop: averaging lowpass (treble loss per pass) + linear-interp
+    // fractional delay for tuning; g sets ~-60 dB at `secs`.
+    const g = Math.pow(10, -3 / (secs * f));
+    for (let i = exLen; i < len; i++) {
+      const s0 = 0.5 * (out[i - N] + out[i - N - 1]);
+      const s1 = 0.5 * (out[i - N - 1] + out[i - N - 2]);
+      out[i] = g * ((1 - frac) * s0 + frac * s1);
+    }
+
+    let peak = 0;
+    for (let i = 0; i < len; i++) { const a = Math.abs(out[i]); if (a > peak) peak = a; }
+    if (peak > 0) for (let i = 0; i < len; i++) out[i] /= peak;
+    return out;
   }
 
   /* Natural minor scale intervals; used by scale lock and note naming. */
@@ -137,5 +192,5 @@ MDS.dsp = (function () {
     return NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
   }
 
-  return { midiToFreq, noiseBuffer, pulseWave, distCurve, crushCurve, makeIR, snapToScale, noteName, MINOR, KEY_TO_PC };
+  return { midiToFreq, noiseBuffer, pulseWave, distCurve, crushCurve, makeIR, karplus, snapToScale, noteName, MINOR, KEY_TO_PC };
 })();

@@ -41,24 +41,30 @@ jobs:
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
   # Sticky preview-URL comment on the branch's open PR (if any). One comment,
-  # found by a hidden marker and updated in place.
+  # found by a hidden marker and updated in place. Skipped for default-branch
+  # pushes: their PRs are already closed, so the runner would spin for nothing.
   pr-comment:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     needs: deploy
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
     steps:
+      - uses: actions/checkout@v4
+      # The slug rule lives ONLY in build-preview-site.mjs; ask it.
+      - id: slug
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: echo "slug=$(node scripts/build-preview-site.mjs --slug "$BRANCH")" >> "$GITHUB_OUTPUT"
       - uses: actions/github-script@v7
+        env:
+          SLUG: ${{ steps.slug.outputs.slug }}
         with:
           script: |
             const branch = context.ref.replace('refs/heads/', '');
-            const defaultBranch = context.payload.repository.default_branch;
             const [owner, repo] = [context.repo.owner, context.repo.repo];
             const base = `https://${owner}.github.io/${repo}`;
-            // slug rule must match scripts/build-preview-site.mjs
-            const slug = branch.replace(/\//g, '--').replace(/[^A-Za-z0-9._-]/g, '-');
-            const url = branch === defaultBranch ? `${base}/` : `${base}/previews/${slug}/`;
+            const url = `${base}/previews/${process.env.SLUG}/`;
             const marker = '<!-- deploy-pages preview url -->';
             const body = `${marker}\nLive preview for \`${branch}\`: ${url}\n\n(Redeploys on every push; allow ~1 min plus up to 10 min of Pages edge cache.)`;
             const prs = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${branch}` });

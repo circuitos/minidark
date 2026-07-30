@@ -22,8 +22,14 @@ MDS.ui.keyboard = (function () {
   const BLACK = { 1: true, 3: true, 6: true, 8: true, 10: true };
 
   const held = {};       // note → voice handle (pointer + qwerty share it)
+  // QWERTY offset → the note it actually started. keyup must release THAT
+  // note: recomputing playedNote(off) at release time misses whenever the
+  // octave, key or scale lock changed while the key was down, leaving the
+  // voice ringing forever (its oscillators only stop inside release()).
+  const heldOffsets = {};
   let keyEls = {};       // note → DOM key
   let root = null, nameEl = null;
+  let built = false;     // global listeners registered (see build)
 
   function baseC() { return 48 + S().sel.octave * 12; }  // C3 default
 
@@ -51,7 +57,10 @@ MDS.ui.keyboard = (function () {
     if (keyEls[n]) keyEls[n].classList.remove("is-down");
   }
 
-  function allOff() { for (const n of Object.keys(held)) noteOff(+n); }
+  function allOff() {
+    for (const n of Object.keys(held)) noteOff(+n);
+    for (const off of Object.keys(heldOffsets)) delete heldOffsets[off];
+  }
 
   function build(container) {
     root = container;
@@ -72,12 +81,7 @@ MDS.ui.keyboard = (function () {
     const hint = document.createElement("span");
     hint.className = "seq-help is-right"; hint.textContent = C().kbd.hint;
     /* Same cell rhythm as the transport and sequencer headers. */
-    const kCell = (...kids) => {
-      const d = document.createElement("div");
-      d.className = "hd-cell";
-      d.append(...kids);
-      return d;
-    };
+    const kCell = (...kids) => MDS.ui.cell("hd-cell", ...kids);
     head.append(kCell(title), kCell(down, up), kCell(nameEl), hint);
 
     const kb = document.createElement("div");
@@ -86,6 +90,12 @@ MDS.ui.keyboard = (function () {
     container._kb = kb;
     render();
 
+    /* Global listeners and bus subscriptions register exactly once: a second
+       build() re-renders the DOM but must not double every note trigger
+       (the bus has no off() by design). */
+    if (built) return;
+    built = true;
+
     /* QWERTY handling (global) */
     document.addEventListener("keydown", (e) => {
       if (e.repeat) return;
@@ -93,13 +103,18 @@ MDS.ui.keyboard = (function () {
       // shortcuts own the modified keys: Ctrl+Z is undo, not the Z note
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const off = QWERTY[e.key.toLowerCase()];
-      if (off != null) { noteOn(playedNote(off)); }
+      if (off != null) {
+        const n = playedNote(off);
+        heldOffsets[off] = n;
+        noteOn(n);
+      }
     });
     document.addEventListener("keyup", (e) => {
       const off = QWERTY[e.key.toLowerCase()];
-      if (off != null) {
-        // release ALL held notes matching this offset's snapped pitch
-        noteOff(playedNote(off));
+      if (off != null && heldOffsets[off] != null) {
+        // release the note this key actually started (see heldOffsets above)
+        noteOff(heldOffsets[off]);
+        delete heldOffsets[off];
       }
     });
     window.addEventListener("blur", allOff);

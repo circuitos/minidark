@@ -22,6 +22,9 @@ MDS.ui.tooltip = (function () {
 
   function show(target) {
     const key = target.dataset.tt;
+    // HINTS toggle (main.js): all help stays quiet when off, except the
+    // toggle's own tip, so the way back stays discoverable.
+    if (MDS.state && MDS.state.tipsOn === false && key !== "tips") return;
     const tip = MDS.CONTENT.tooltips[key];
     if (!tip) return;
     ensure();

@@ -11,14 +11,17 @@ MDS.ui.exportDialog = (function () {
   const C = () => MDS.CONTENT.export;
   const S = () => MDS.state;
 
-  function download(blob, name) {
+  /* The one blob-download helper (topbar SAVE uses it too: two copies of
+     this had already drifted once). */
+  MDS.ui.download = function (blob, name) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = name;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
-  }
+  };
+  const download = MDS.ui.download;
 
   function radio(name, value, label, checked, tip) {
     const wrap = document.createElement("label");
@@ -31,8 +34,16 @@ MDS.ui.exportDialog = (function () {
     return { wrap, r };
   }
 
+  let isOpen = false;   // one dialog at a time: stacked modals stack Esc handlers
+  let mp3Timer = null;  // re-checks a still-loading lamejs (see below)
+
   function open() {
-    const m = MDS.ui.modal.open({ title: C().title });
+    if (isOpen) return;
+    isOpen = true;
+    const m = MDS.ui.modal.open({
+      title: C().title,
+      onClose: () => { isOpen = false; clearInterval(mp3Timer); mp3Timer = null; },
+    });
 
     /* project name */
     const nameWrap = document.createElement("label");
@@ -40,7 +51,9 @@ MDS.ui.exportDialog = (function () {
     const nl = document.createElement("span"); nl.textContent = MDS.CONTENT.transport.projName;
     const nameIn = document.createElement("input");
     nameIn.type = "text"; nameIn.value = S().project.name;
-    nameIn.oninput = () => { S().project.name = nameIn.value; };
+    // "name" keeps the topbar field in step; the dialog is rebuilt per open,
+    // so the sync only needs to flow outward.
+    nameIn.oninput = () => { S().project.name = nameIn.value; MDS.bus.emit("name"); };
     nameWrap.append(nl, nameIn);
 
     /* scope */
@@ -64,6 +77,16 @@ MDS.ui.exportDialog = (function () {
       const n = document.createElement("div"); n.className = "exp-note";
       n.textContent = C().mp3Unavailable;
       notes.appendChild(n);
+      // lamejs may still be in flight from the CDN: re-enable if it lands
+      // while this dialog is open, instead of demanding a reopen.
+      if (MDS.LAME_STATE === "loading") {
+        mp3Timer = setInterval(() => {
+          if (!MDS.exporter.mp3Available()) return;
+          fMp3.r.disabled = false;
+          n.remove();
+          clearInterval(mp3Timer); mp3Timer = null;
+        }, 500);
+      }
     }
     if (!MDS.exporter.webmMime()) {
       fWebm.r.disabled = true;
@@ -81,12 +104,18 @@ MDS.ui.exportDialog = (function () {
       if (scope === "song" && !S().project.song.length) {
         log.textContent = C().emptySong; log.className = "exp-note"; return;
       }
+      // Soft cap: render + encode are synchronous full-length allocations, so
+      // an unbounded chain would freeze the tab or exhaust memory.
+      if (scope === "song" && S().project.song.length > 300) {
+        log.textContent = C().tooLong(S().project.song.length); log.className = "exp-note"; return;
+      }
       const fmt = fMp3.r.checked ? "mp3" : fWebm.r.checked ? "webm" : "wav";
       render.disabled = true;
       log.className = "exp-log";
       log.textContent = C().rendering;
       try {
         const buffer = await MDS.exporter.render(S().project, { scope, patternIdx: S().sel.pattern });
+        if (!document.contains(log)) return;   // dialog closed mid-render
         let blob, ext = fmt;
         if (fmt === "mp3" && MDS.exporter.mp3Available()) blob = MDS.exporter.encodeMp3(buffer, 192);
         else if (fmt === "webm") { blob = await MDS.exporter.recordCompressed(buffer); ext = blob.type.includes("ogg") ? "ogg" : "webm"; }

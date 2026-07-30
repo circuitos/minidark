@@ -14,6 +14,34 @@
     return e;
   }
 
+  /* Circular-arrow icon for undo (counter-clockwise) / redo (clockwise):
+     a 300° arc with the head at the top edge of the gap, mirrored for redo.
+     Inline SVG in currentColor, so it follows button state like text would. */
+  function historyIcon(clockwise) {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 20 20");
+    svg.setAttribute("class", "btn-icon");
+    svg.setAttribute("aria-hidden", "true");
+    const g = document.createElementNS(NS, "g");
+    if (clockwise) g.setAttribute("transform", "translate(20 0) scale(-1 1)");
+    // Browser-reload composition, mirrored: a 280° arc (center (10,11), r 6)
+    // whose head dives counter-clockwise into the empty gap on the upper
+    // left, arc trailing behind it. Mirrored, it turns clockwise (redo).
+    const arc = document.createElementNS(NS, "path");
+    arc.setAttribute("d", "M 5.1 14.4 A 6 6 0 1 0 5.8 6.8");
+    arc.setAttribute("fill", "none");
+    arc.setAttribute("stroke", "currentColor");
+    arc.setAttribute("stroke-width", "2");
+    arc.setAttribute("stroke-linecap", "round");
+    const head = document.createElementNS(NS, "path");
+    head.setAttribute("d", "M 2.5 10 L 4.6 5.6 L 7 8 Z");
+    head.setAttribute("fill", "currentColor");
+    g.append(arc, head);
+    svg.appendChild(g);
+    return svg;
+  }
+
   function buildTopbar(bar) {
     bar.className = "topbar";
     const logo = el("span", "logo", C().app.title);
@@ -24,13 +52,20 @@
     nameIn.value = S().project.name;
     nameIn.oninput = () => { S().project.name = nameIn.value; };
     MDS.bus.on("project", () => { nameIn.value = S().project.name; });
+    // the EXPORT dialog has a name field too; follow its edits live
+    MDS.bus.on("name", () => { nameIn.value = S().project.name; });
 
     const grow = el("span", "grow");
 
-    /* History pair: greyed out when there is nothing left in that direction,
-       so the buttons also say how much room you have to experiment. */
-    const undo = el("button", null, C().transport.undo); undo.dataset.tt = "undo";
-    const redo = el("button", null, C().transport.redo); redo.dataset.tt = "redo";
+    /* History pair: circular-arrow icons (counter-clockwise = undo), greyed
+       out when there is nothing left in that direction, so the buttons also
+       say how much room you have to experiment. Names live on aria-label. */
+    const undo = el("button", "icon-btn"); undo.dataset.tt = "undo";
+    undo.setAttribute("aria-label", C().transport.undo);
+    undo.appendChild(historyIcon(false));
+    const redo = el("button", "icon-btn"); redo.dataset.tt = "redo";
+    redo.setAttribute("aria-label", C().transport.redo);
+    redo.appendChild(historyIcon(true));
     undo.onclick = () => MDS.history.undo();
     redo.onclick = () => MDS.history.redo();
     const syncHistory = () => {
@@ -43,11 +78,7 @@
     const save = el("button", null, C().transport.save); save.dataset.tt = "save";
     save.onclick = () => {
       const blob = new Blob([S().toJSON()], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = MDS.exporter.filename(S().project, "minidark.json");
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      MDS.ui.download(blob, MDS.exporter.filename(S().project, "minidark.json"));
     };
 
     const openBtn = el("button", null, C().transport.open); openBtn.dataset.tt = "open";
@@ -76,39 +107,44 @@
     const glo = el("button", null, C().transport.glossary); glo.dataset.tt = "glossary";
     glo.onclick = () => MDS.ui.glossary.open();
 
-    bar.append(logo, sub, nameIn, grow, undo, redo, save, openBtn, fileIn, reset, exp, les, glo);
+    /* HINTS: hover/alt help text on or off (session preference; the app
+       stores nothing between visits, by design). */
+    const hints = el("button", null, C().transport.hints); hints.dataset.tt = "tips";
+    const syncHints = () => hints.classList.toggle("is-on", S().tipsOn !== false);
+    hints.onclick = () => {
+      S().tipsOn = !S().tipsOn;
+      syncHints();
+      MDS.ui.tooltip.hide();
+      MDS.bus.emit("tips");
+    };
+    syncHints();
+
+    bar.append(logo, sub, nameIn, grow, undo, redo, save, openBtn, fileIn, reset, exp, les, glo, hints);
   }
 
+  /* RESET confirm rides the shared modal (Esc, backdrop-click, close button
+     come with it); Enter-to-confirm is this dialog's own addition, removed
+     again through the modal's onClose. */
   function confirmReset() {
     const cc = C().confirm;
-    const back = el("div", "modal-back");
-    const modal = el("div", "modal modal-sm");
-    const head = el("div", "modal-head");
-    head.appendChild(el("h2", null, cc.resetTitle));
-    const body = el("div", "modal-body");
-    body.appendChild(el("p", null, cc.resetBody));
-    const foot = el("div", "modal-foot");
-    const grow = el("span", "grow");
+    const onKey = (e) => { if (e.key === "Enter") { e.preventDefault(); ok.click(); } };
+    const m = MDS.ui.modal.open({
+      title: cc.resetTitle,
+      onClose: () => document.removeEventListener("keydown", onKey),
+    });
+    m.body.closest(".modal").classList.add("modal-sm");
+    m.body.appendChild(el("p", null, cc.resetBody));
     const cancel = el("button", null, cc.resetCancel);
     const ok = el("button", "btn-danger", cc.resetOk);
-    const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
-    cancel.onclick = close;
+    cancel.onclick = () => m.close();
     ok.onclick = () => {
       MDS.seq.stop();
       S().newProject();
-      close();
+      m.close();
       MDS.ui.toast(cc.resetDone);
     };
-    function onKey(e) {
-      if (e.key === "Escape") { e.preventDefault(); close(); }
-      else if (e.key === "Enter") { e.preventDefault(); ok.click(); }
-    }
     document.addEventListener("keydown", onKey);
-    back.onclick = (e) => { if (e.target === back) close(); };
-    foot.append(grow, cancel, ok);
-    modal.append(head, body, foot);
-    back.appendChild(modal);
-    document.body.appendChild(back);
+    m.foot.append(el("span", "grow"), cancel, ok);
     ok.focus();
   }
 

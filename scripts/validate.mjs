@@ -22,7 +22,7 @@ for (const e of MDS.SOUND_LIBRARY) {
   if (!catKeys.has(e.category)) fail(`library entry "${e.id}" has unknown category "${e.category}"`);
   if (e.source.type === "synth") {
     const eng = e.source.patch && e.source.patch.engine;
-    if (!["sub", "fm", "drum"].includes(eng)) fail(`library entry "${e.id}" has invalid engine "${eng}"`);
+    if (!["sub", "fm", "pluck", "drum"].includes(eng)) fail(`library entry "${e.id}" has invalid engine "${eng}"`);
   } else if (!["base64", "url"].includes(e.source.type)) {
     fail(`library entry "${e.id}" has unknown source type "${e.source.type}"`);
   }
@@ -31,6 +31,21 @@ for (const id of Object.keys(C.libNames)) {
   if (!libIds.has(id)) fail(`CONTENT.libNames has orphan id "${id}" (no such library entry)`);
 }
 ok(`library: ${MDS.SOUND_LIBRARY.length} entries, names + categories consistent`);
+
+/* ── library lore: every sound anchored in the real world ──────────────── */
+const glossaryTerms = new Set(C.glossary.map(([term]) => term));
+for (const e of MDS.SOUND_LIBRARY) {
+  const info = C.libInfo[e.id];
+  if (!info || !info.text || !info.wiki) { fail(`library entry "${e.id}" has no CONTENT.libInfo lore (text + wiki)`); continue; }
+  if (!/^https:\/\//.test(info.wiki)) fail(`libInfo "${e.id}" wiki link is not https: ${info.wiki}`);
+  for (const t of info.terms || []) {
+    if (!glossaryTerms.has(t)) fail(`libInfo "${e.id}" references glossary term "${t}" which does not exist`);
+  }
+}
+for (const id of Object.keys(C.libInfo)) {
+  if (!libIds.has(id)) fail(`CONTENT.libInfo has orphan id "${id}" (no such library entry)`);
+}
+ok(`libInfo: lore + https link for all ${MDS.SOUND_LIBRARY.length} sounds, glossary cross-refs resolve`);
 
 /* ── demo tracks ───────────────────────────────────────────────────────── */
 for (const id of MDS.demos.ids()) {
@@ -56,17 +71,24 @@ for (const id of MDS.demos.ids()) {
     });
   });
   for (const tr of p.tracks) {
-    if (!tr.patch || !["sub", "fm", "drum", "buffer"].includes(tr.patch.engine)) {
+    if (!tr.patch || !["sub", "fm", "pluck", "drum", "buffer"].includes(tr.patch.engine)) {
       fail(`demo "${id}" track "${tr.key}" has invalid patch`);
     }
   }
-  ok(`demo "${id}": ${p.song.length} bars ≈ ${Math.round(secs)}s, data well-formed`);
+  // the blurb states tempo and key; it must state the REAL ones (they have
+  // drifted apart from demos.js silently before this check existed)
+  const blurb = (C.demos[id] && C.demos[id].blurb) || "";
+  if (!blurb.includes(p.bpm + " BPM")) fail(`demo "${id}" blurb does not state its real tempo (${p.bpm} BPM)`);
+  if (!blurb.includes(p.key + " minor")) fail(`demo "${id}" blurb does not state its real key (${p.key} minor)`);
+  ok(`demo "${id}": ${p.song.length} bars ≈ ${Math.round(secs)}s, data well-formed, blurb in sync`);
 }
 
 /* ── lessons ↔ widgets ─────────────────────────────────────────────────── */
 const lessonsSrc = readFileSync("js/ui/lessons.js", "utf8");
 const widgetKeys = new Set();
-for (const m of lessonsSrc.matchAll(/^\s{4}(\w+)\(box\)\s*{/gm)) widgetKeys.add(m[1]);
+// any indentation: formatting must not be load-bearing (the `box` param name
+// IS the widget-builder contract, so that part stays exact)
+for (const m of lessonsSrc.matchAll(/^\s+([A-Za-z_$]\w*)\(box\)\s*{/gm)) widgetKeys.add(m[1]);
 for (const m of lessonsSrc.matchAll(/widgets\["([\w-]+)"\]/g)) widgetKeys.add(m[1]);
 if (C.lessons.length < 7) fail(`only ${C.lessons.length} lessons (spec: 7)`);
 for (const L of C.lessons) {

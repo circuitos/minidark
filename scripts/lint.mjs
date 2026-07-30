@@ -35,7 +35,9 @@ const owners = {};
 for (const f of walk("js", [".js"])) {
   const src = readFileSync(f, "utf8");
   for (const line of src.split("\n")) {
-    const m = line.match(/^(?:window\.)?MDS\.([A-Za-z_$][\w]*(?:\.[A-Za-z_$][\w]*)?)\s*=/);
+    // Leading whitespace and 3+ path segments count too: indented definitions
+    // (MDS.selftest in main.js) used to slip past this guard entirely.
+    const m = line.match(/^\s*(?:window\.)?MDS\.([A-Za-z_$][\w]*(?:\.[A-Za-z_$][\w]*)*)\s*=(?!=)/);
     if (!m || line.includes("|| {}")) continue;
     const path = m[1];
     if (owners[path] && owners[path] !== f) fail(`duplicate global MDS.${path} defined in ${owners[path]} and ${f}`);
@@ -44,8 +46,10 @@ for (const f of walk("js", [".js"])) {
 }
 ok(`globals: ${Object.keys(owners).length} MDS.* definitions, no collisions`);
 
-/* 3 ── THEME rule: raw colors live only in css/theme.css */
-const colorRx = /#[0-9a-fA-F]{3,8}\b|\brgba?\(/;
+/* 3 ── THEME rule: raw colors live only in css/theme.css.
+   Hex lengths are exact (3/4/6/8): {3,8} also matched English-looking
+   strings like "#faded" and DOM ids, failing the build on non-colors. */
+const colorRx = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b|\brgba?\(/;
 for (const f of ["css/app.css", ...walk("js", [".js"])]) {
   const lines = readFileSync(f, "utf8").split("\n");
   lines.forEach((line, i) => {

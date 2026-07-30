@@ -162,6 +162,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 .topbar .logo::first-letter { color: var(--c-accent); }
 .topbar .grow { flex: 1; }
 .topbar .proj-name { width: 11rem; }
+/* Icon-only buttons (undo/redo): square hit target, glyph in currentColor. */
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 1.9rem; padding: var(--sp-2); }
+.btn-icon { width: 1.05rem; height: 1.05rem; display: block; }
 .tbgroup { display: flex; align-items: center; gap: var(--sp-2); }
 /* Sound picker and its RANDOMIZE button share one line above the dials. */
 .inst-head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
@@ -266,7 +269,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 .pat-bank button.is-cur { border-color: var(--c-accent2); color: var(--c-ink0); background: var(--c-bg3); }
 .pat-bank button.is-live { color: var(--c-accent); }
 
-/* Faint signal-grid matrix behind the steps. */
+/* Faint signal-grid matrix behind the steps. It can only line up inside each
+   4-step group: the beat gap shifts every group rightward, so past the first
+   beat it reads as texture, not as a ruler. Decided and accepted (audit
+   G1-7): it is a backdrop. */
 .grid-scroll { overflow-x: auto; border-radius: var(--r-m); padding: var(--sp-1) 0; }
 .grid {
   display: flex; flex-direction: column; gap: var(--cell-gap); width: max-content;
@@ -277,7 +283,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 }
 .grid-row { display: flex; align-items: center; gap: var(--cell-gap); }
 .row-head {
-  width: 6.6rem; flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-2);
+  width: var(--rowhead-w); flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-2);
   border-radius: var(--r-s); padding: var(--sp-2); min-height: var(--cell-h);
   cursor: pointer; border: var(--bw) solid var(--c-line); background: var(--c-bg2);
   font-size: var(--fs-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em;
@@ -477,8 +483,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
   width: 4.9rem;
 }
 /* Uniform name band so long track names never shift a strip's controls. */
-.strip .s-name { width: 100%; min-height: 1.6rem; }
-.strip .s-name { font-size: var(--fs-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-ink1); }
+.strip .s-name {
+  width: 100%; min-height: 1.6rem;
+  font-size: var(--fs-xs); font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--c-ink1);
+}
 .strip .ms { display: flex; gap: var(--sp-1); }
 .strip .ms button { font-size: var(--fs-xs); padding: 0 var(--sp-2); min-height: 1.6rem; }
 .strip .sends { display: flex; flex-direction: column; gap: var(--sp-1); }
@@ -486,7 +495,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 /* ── Step column LEDs ─────────────────────────────────────────────────── */
 .col-leds {
   display: flex; align-items: center; gap: var(--cell-gap);
-  margin-left: calc(6.6rem + var(--cell-gap)); margin-bottom: var(--sp-1);
+  margin-left: calc(var(--rowhead-w) + var(--cell-gap)); margin-bottom: var(--sp-1);
   width: max-content;
 }
 .col-led {
@@ -665,16 +674,41 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 .lib-item.is-cur { border-color: var(--c-accent2); background: var(--c-bg2); }
 .lib-item .l-name { flex: 1; }
 .lib-item .l-tags { color: var(--c-ink2); font-size: var(--fs-xs); font-family: var(--font-mono); }
+/* Small square secondary actions on a library row (lore ⓘ, sample remove). */
+.lib-item .l-info, .lib-item .l-x {
+  min-width: 1.7rem; min-height: 1.7rem; padding: 0 var(--sp-1);
+  font-size: var(--fs-xs); font-family: var(--font-mono);
+}
+/* Lore panel: sits under its item in the list, reads as a footnote. */
+.lib-info {
+  border-left: calc(2 * var(--bw)) solid var(--c-accent2-soft);
+  background: var(--c-bg2); border-radius: var(--r-s);
+  margin: 0 0 var(--sp-1) var(--sp-3);
+  padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.lib-info p { color: var(--c-ink1); font-size: var(--fs-s); }
+.lib-info .li-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); }
+.lib-info .li-term {
+  font-size: var(--fs-xs); font-family: var(--font-mono);
+  min-height: 1.5rem; padding: 0 var(--sp-2);
+  background: var(--c-bg0); color: var(--c-accent2); border-color: var(--c-line);
+}
+.lib-info .li-term:hover { border-color: var(--c-accent2); }
+.lib-info .li-wiki { margin-left: auto; font-size: var(--fs-xs); }
+/* Demo cards, compact: title and actions share a row, blurb tucks under,
+   freeing the vertical space the sample importer now uses. */
 .demo-card {
   border: var(--bw) solid var(--c-hair); border-radius: var(--r-m);
   background: var(--c-glass2);
-  padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1);
   transition: border-color var(--dur-2) var(--ease);
 }
 .demo-card:hover { border-color: var(--c-hair-strong); }
 .demo-card strong { font-weight: 600; letter-spacing: 0.02em; }
+.demo-card .d-head { display: flex; align-items: center; gap: var(--sp-2); }
+.demo-card .d-head .grow { flex: 1; }
+.demo-card .d-head button { font-size: var(--fs-xs); min-height: 1.6rem; padding: 0 var(--sp-2); }
 .demo-card .d-desc { color: var(--c-ink1); font-size: var(--fs-s); }
-.demo-card .d-btns { display: flex; gap: var(--sp-2); }
 
 /* ── Modals (lessons, glossary, export) ───────────────────────────────── */
 .modal-back {

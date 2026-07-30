@@ -58,7 +58,8 @@ MDS.ui.toast = (function () {
 /* ── Glossary ──────────────────────────────────────────────────────────── */
 MDS.ui.glossary = (function () {
   "use strict";
-  function open() {
+  /* Optional `query` prefills the search (library ⓘ notes deep-link here). */
+  function open(query) {
     const m = MDS.ui.modal.open({ title: MDS.CONTENT.glossaryTitle });
     const search = document.createElement("input");
     search.type = "text"; search.placeholder = MDS.CONTENT.glossarySearch;
@@ -73,7 +74,8 @@ MDS.ui.glossary = (function () {
       }
     }
     search.oninput = () => render(search.value);
-    render("");
+    if (query) search.value = query;
+    render(query || "");
     m.body.append(search, dl);
   }
   return { open };
@@ -257,12 +259,15 @@ MDS.ui.lessons = (function () {
         c.onclick = () => { steps[i] = !steps[i]; c.classList.toggle("is-on", steps[i]); };
         grid.appendChild(c); cellEls.push(c);
       }
+      const timers = new Set();  // pending playhead updates; cleared on close
       const loop = makeLoop((step, t) => {
         if (steps[step]) MDS.synth.trigger(S().audio.graph, 0, kick, { time: t, dur: 0.2, vel: 0.9, dest: S().audio.graph.master.input });
         const ms = Math.max(0, (t - S().audio.ctx.currentTime) * 1000);
-        setTimeout(() => {
+        const id = setTimeout(() => {
+          timers.delete(id);
           cellEls.forEach((c, i) => c.classList.toggle("is-play", i === step && loop.playing));
         }, ms);
+        timers.add(id);
       });
       const play = document.createElement("button");
       play.textContent = W().play;
@@ -270,7 +275,11 @@ MDS.ui.lessons = (function () {
         if (loop.playing) { loop.stop(); play.textContent = W().play; play.classList.remove("is-on"); cellEls.forEach((c) => c.classList.remove("is-play")); }
         else { loop.start(); play.textContent = W().stop; play.classList.add("is-on"); }
       };
-      addCleanup(() => loop.stop());
+      addCleanup(() => {
+        loop.stop();
+        timers.forEach(clearTimeout);  // queued updates must not touch detached cells
+        timers.clear();
+      });
       box.append(grid, play);
     },
 

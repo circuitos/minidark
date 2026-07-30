@@ -23,10 +23,16 @@ touched a synthesizer.
 
 - **Synth engine** (Web Audio, everything synthesized, zero audio assets):
   subtractive voices (saw/pulse, resonant lowpass, ADSR), a 2-op FM voice,
+  Karplus-Strong plucked strings (guitars, acoustic through distorted),
   and a full 808/909-style drum kit incl. industrial hits.
-- **40-sound library** with several presets per instrument family (six snares:
-  gated, 808, glitch, clap-snare, crack, dry), grouped so the family a track
-  already uses comes first in its SOUND picker.
+- **46-sound library** with several presets per instrument family (six snares:
+  gated, 808, glitch, clap-snare, crack, dry; six guitars), grouped so the
+  family a track already uses comes first in its SOUND picker. Every sound
+  carries a ⓘ history note: the real machine or record it is modeled on,
+  with a Wikipedia link and glossary cross-references.
+- **Sample import**: load short audio files as instruments on any track
+  (repitchable, FX-sendable); they are stored inside the project file, so a
+  saved project stays self-contained.
 - **Effects**: waveshaper distortion, chorus, tempo-synced delay, convolution
   reverb with a procedurally generated impulse response, bitcrusher, plus a
   glue-compressed, limited master bus so beginners can't clip.
@@ -38,8 +44,10 @@ touched a synthesizer.
 - **RANDOMIZE** on every instrument: rerolls each dial inside ranges the voice
   can still render, plays the result, and stays one undo away.
 - **Learning layer**: 7 interactive lessons with live sound demos, tooltips
-  on every control, a 55-term glossary, and three original, fully editable
-  demo tracks (brooding / mid-tempo / aggressive).
+  on every control (toggleable via HINTS), a 67-term glossary that now covers
+  the machines behind the sounds (TR-808, TB-303, DX7, Karplus-Strong…), and
+  three original, fully editable demo tracks (brooding / mid-tempo /
+  aggressive).
 - **Export**: deterministic offline render to WAV (always), MP3 (lamejs from
   cdnjs, graceful WAV-only fallback), OGG/WebM where supported. Projects
   save/load as JSON files; the app deliberately uses no localStorage.

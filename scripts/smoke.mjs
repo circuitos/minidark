@@ -30,6 +30,40 @@ const crush = dsp.crushCurve(4);
 assert(new Set(crush).size <= 17, `crushCurve(4) has ${new Set(crush).size} levels (want ≤ 2^4+1)`);
 ok("dsp: tuning, scale lock, curves");
 
+/* ── Karplus-Strong string (the guitar engine's sample generator) ──────── */
+{
+  const SR = 44100;
+  const p = { decay: 0.6, bright: 0.8, pick: 0.4 };
+  const a = dsp.karplus(SR, 110, p);
+  // ArrayBuffer.isView, not instanceof: the sandbox realm has its own Float32Array
+  assert(ArrayBuffer.isView(a) && a.length > SR, `karplus length ${a.length}`);
+  let finite = true, peak = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (!Number.isFinite(a[i])) { finite = false; break; }
+    if (Math.abs(a[i]) > peak) peak = Math.abs(a[i]);
+  }
+  assert(finite, "karplus produced non-finite samples");
+  assert(peak > 0.9 && peak <= 1.0001, `karplus peak ${peak} (want normalized)`);
+  const rms = (from, to) => {
+    let s = 0;
+    for (let i = from; i < to; i++) s += a[i] * a[i];
+    return Math.sqrt(s / (to - from));
+  };
+  const head = rms(0, Math.floor(a.length * 0.1));
+  const tail = rms(Math.floor(a.length * 0.9), a.length);
+  assert(tail < head * 0.2, `karplus does not decay (head ${head}, tail ${tail})`);
+  // deterministic: exports must be bit-identical run to run
+  const b = dsp.karplus(SR, 110, p);
+  let same = a.length === b.length;
+  for (let i = 0; same && i < a.length; i++) if (a[i] !== b[i]) same = false;
+  assert(same, "karplus is not deterministic");
+  // muted string dies much faster than an open one
+  assert(dsp.karplus(SR, 110, { decay: 0.05, bright: 0.5, pick: 0.3 }).length <
+         dsp.karplus(SR, 110, { decay: 0.95, bright: 0.5, pick: 0.3 }).length,
+    "karplus decay does not scale ring length");
+  ok("dsp: karplus string is pitched noise that decays, deterministically");
+}
+
 /* ── sequencer scheduling over all demo songs (stubbed synth) ──────────── */
 let triggers = 0;
 sandbox.MDS.synth = {
@@ -101,6 +135,37 @@ for (const id of MDS.demos.ids()) {
   }
   assert(changed / rolls > 0.99, `only ${changed} of ${rolls} rolls changed the patch`);
   ok(`randomizer: ${rolls} rolls stay in range, engine and drum kind preserved`);
+}
+
+/* ── imported samples: registry + project-file round trip ──────────────── */
+{
+  const S = MDS.state;
+  const rec = S.addSample({ name: "door slam", mime: "audio/wav", data: "AAAA", secs: 0.5 });
+  assert(/^u\d+$/.test(rec.id), `sample id "${rec.id}" unexpected`);
+  assert(MDS.lib.get(rec.id) && MDS.lib.get(rec.id).name === "door slam", "sample not registered in library");
+  const patch = MDS.lib.materialize(rec.id);
+  assert(patch && patch.engine === "buffer", "sample does not materialize as a buffer patch");
+  const json = S.toJSON();
+  S.removeSample(rec.id);
+  assert(!MDS.lib.get(rec.id), "removeSample left the registry entry behind");
+  S.loadJSON(json);
+  assert(S.samples.length === 1 && MDS.lib.get(rec.id), "samples did not survive a save/load round trip");
+  const rec2 = S.addSample({ name: "second", mime: "audio/wav", data: "AAAA", secs: 0.1 });
+  assert(rec2.id !== rec.id, "sample ids collide after a project load");
+  S.removeSample(rec.id); S.removeSample(rec2.id);
+  assert(!JSON.parse(S.toJSON()).project.samples, "samples leaked into project (would bloat every undo snapshot)");
+  ok("samples: register, materialize, save/load round trip, ids never collide");
+}
+
+/* ── export tail follows the last bar's slowest release ────────────────── */
+{
+  const p = MDS.state.defaultProject();
+  assert(Math.abs(MDS.exporter.tailSecs(p, 0) - MDS.exporter.TAIL) < 1e-9,
+    "empty last bar should keep the base tail");
+  p.patterns[0].steps[6][0] = { on: true, acc: false, note: 57, len: 16 }; // pad row: padWarm r=0.9
+  const t = MDS.exporter.tailSecs(p, 0);
+  assert(Math.abs(t - (MDS.exporter.TAIL + 0.9 * 4)) < 1e-9, `pad in last bar gave tail ${t}s`);
+  ok("export: tail extends for what still rings in the final bar");
 }
 
 /* ── WAV encoder against a fake AudioBuffer ────────────────────────────── */

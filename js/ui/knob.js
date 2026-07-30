@@ -6,6 +6,40 @@
 window.MDS = window.MDS || {};
 MDS.ui = MDS.ui || {};
 
+/* Shared wheel / arrow-key / double-click contract for the two continuous
+   controls (knob and fader). ONE owner: a step-size or behavior change here
+   is automatically the change for both widgets (they used to carry
+   byte-identical copies, which had already earned one two-file bugfix).
+   c: { get, set, toNorm, fromNorm, min, max, initial } */
+/* Shared header/tool cell: seq, song and keyboard headers used to carry four
+   copies of this wrapper (knob.js hosts the tiny cross-widget helpers because
+   it is the first UI file in the load order). */
+MDS.ui.cell = function (cls, ...kids) {
+  const d = document.createElement("div");
+  d.className = cls;
+  d.append(...kids);
+  return d;
+};
+
+MDS.ui.ctlKeys = function (el, c) {
+  el.addEventListener("dblclick", () => c.set(c.initial));
+  el.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    c.set(c.fromNorm(c.toNorm(c.get()) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.03)));
+  }, { passive: false });
+  el.addEventListener("keydown", (e) => {
+    const step = e.shiftKey ? 0.01 : 0.04;
+    if (e.key === "ArrowUp" || e.key === "ArrowRight") { c.set(c.fromNorm(c.toNorm(c.get()) + step)); e.preventDefault(); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowLeft") { c.set(c.fromNorm(c.toNorm(c.get()) - step)); e.preventDefault(); }
+    else if (e.key === "Home") { c.set(c.min); e.preventDefault(); }
+    else if (e.key === "End") { c.set(c.max); e.preventDefault(); }
+  });
+};
+
+/* --knob-stroke-w is a constant token (single dark theme by design): read it
+   once, not once per knob (one MIXER render builds 40 of them). */
+let knobStrokeW = 0;
+
 MDS.ui.knob = function (opts) {
   "use strict";
   const min = opts.min, max = opts.max;
@@ -36,8 +70,11 @@ MDS.ui.knob = function (opts) {
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("viewBox", "0 0 40 40");
-  const css = getComputedStyle(document.documentElement);
-  const sw = parseFloat(css.getPropertyValue("--knob-stroke-w")) || 4;
+  if (!knobStrokeW) {
+    knobStrokeW = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue("--knob-stroke-w")) || 4;
+  }
+  const sw = knobStrokeW;
   const R = 16;
   const a0 = 135, sweep = 270;
   const polar = (deg) => {
@@ -95,6 +132,7 @@ MDS.ui.knob = function (opts) {
   /* drag */
   let dragY = null, dragN = 0;
   el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return; // right-click must not start a drag (see seq.js cells)
     dragY = e.clientY; dragN = toNorm(value);
     el.classList.add("is-active");
     el.setPointerCapture(e.pointerId);
@@ -107,18 +145,7 @@ MDS.ui.knob = function (opts) {
   });
   el.addEventListener("pointerup", () => { dragY = null; el.classList.remove("is-active"); });
   el.addEventListener("pointercancel", () => { dragY = null; el.classList.remove("is-active"); });
-  el.addEventListener("dblclick", () => set(initial));
-  el.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    set(fromNorm(toNorm(value) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.03)));
-  }, { passive: false });
-  el.addEventListener("keydown", (e) => {
-    const fine = e.shiftKey ? 0.01 : 0.04;
-    if (e.key === "ArrowUp" || e.key === "ArrowRight") { set(fromNorm(toNorm(value) + fine)); e.preventDefault(); }
-    else if (e.key === "ArrowDown" || e.key === "ArrowLeft") { set(fromNorm(toNorm(value) - fine)); e.preventDefault(); }
-    else if (e.key === "Home") { set(min); e.preventDefault(); }
-    else if (e.key === "End") { set(max); e.preventDefault(); }
-  });
+  MDS.ui.ctlKeys(el, { get: () => value, set, toNorm, fromNorm, min, max, initial });
 
   set(value, false);
   return { el, set, get: () => value };

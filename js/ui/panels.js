@@ -27,6 +27,24 @@ MDS.ui.panels = (function () {
     return { g, row };
   }
 
+  /* One owner for the FX-send knob row: the INSTRUMENT group and each MIXER
+     strip used to carry verbatim copies of this loop. The "send" + suffix
+     tooltip keys are a documented coupling with validate.mjs. */
+  const SEND_SUFFIX = { dist: "Dist", chorus: "Chor", delay: "Delay", verb: "Verb", crush: "Crush" };
+  function sendKnobRow(container, tr) {
+    const knobs = {};
+    for (const [k, label] of Object.entries(C().sends)) {
+      const kn = MDS.ui.knob({
+        label, tip: "send" + SEND_SUFFIX[k],
+        min: 0, max: 1, value: tr.sends[k], fmt: fmtPct, small: true,
+        onInput: (v) => { tr.sends[k] = v; S().applyMixer(); },
+      });
+      container.appendChild(kn.el);
+      knobs[k] = kn;
+    }
+    return knobs;
+  }
+
   function patchKnob(row, tr, param, spec) {
     const k = MDS.ui.knob({
       label: spec.label, tip: spec.tip, min: spec.min, max: spec.max,
@@ -67,7 +85,8 @@ MDS.ui.panels = (function () {
     const h = document.createElement("h3"); h.textContent = C().inst.sigTitle;
     const path = document.createElement("div"); path.className = "sigpath";
     const eng = tr.patch ? tr.patch.engine : "sub";
-    const first = eng === "sub" ? "osc" : eng === "fm" ? "osc" : eng === "drum" ? "gen" : "sample";
+    const first = eng === "sub" || eng === "fm" ? "osc"
+      : eng === "drum" ? "gen" : eng === "pluck" ? "string" : "sample";
     const nodes = eng === "sub"
       ? [["osc", C().inst.sigNodes.osc], ["filter", C().inst.sigNodes.filter]]
       : [[first, C().inst.sigNodes[first]]];
@@ -88,7 +107,7 @@ MDS.ui.panels = (function () {
 
   function jumpTo(id) {
     if (id === "master") { showTab("fx"); highlightGroup("master"); return; }
-    const map = { gen: "osc", sample: "osc" };
+    const map = { gen: "osc", sample: "osc", string: "osc" };
     highlightGroup(map[id] || id);
   }
 
@@ -125,6 +144,18 @@ MDS.ui.panels = (function () {
       for (const e of entries) {
         const o = document.createElement("option");
         o.value = e.id; o.textContent = C().libNames[e.id] || e.id;
+        grp.appendChild(o);
+      }
+      sel.appendChild(grp);
+    }
+    /* Imported samples close the list (their names are user data, not CONTENT). */
+    const userEntries = MDS.lib.userList();
+    if (userEntries.length) {
+      const grp = document.createElement("optgroup");
+      grp.label = C().lib.samplesTitle;
+      for (const e of userEntries) {
+        const o = document.createElement("option");
+        o.value = e.id; o.textContent = e.name || e.id;
         grp.appendChild(o);
       }
       sel.appendChild(grp);
@@ -172,6 +203,13 @@ MDS.ui.panels = (function () {
       patchKnob(fm.row, tr, "index", { label: C().inst.index, tip: "index", min: 0, max: 12 });
       patchKnob(fm.row, tr, "iDec", { label: C().inst.iDec, tip: "iDec", min: 0.02, max: 2, curve: "exp", fmt: fmtMs });
       bodyEl.appendChild(fm.g);
+    } else if (eng === "pluck") {
+      const st = group(C().inst.gString, "osc");
+      patchKnob(st.row, tr, "decay", { label: C().inst.decay, tip: "decay", min: 0, max: 1, fmt: fmtPct });
+      patchKnob(st.row, tr, "bright", { label: C().inst.bright, tip: "bright", min: 0, max: 1, fmt: fmtPct });
+      patchKnob(st.row, tr, "pick", { label: C().inst.pick, tip: "pick", min: 0, max: 1, fmt: fmtPct });
+      patchKnob(st.row, tr, "body", { label: C().inst.body, tip: "body", min: 0, max: 1, fmt: fmtPct });
+      bodyEl.appendChild(st.g);
     } else if (eng === "drum") {
       const dr = group(C().inst.gDrum, "osc");
       patchKnob(dr.row, tr, "dTune", { label: C().inst.dTune, tip: "dTune", min: 0.5, max: 2 });
@@ -201,19 +239,12 @@ MDS.ui.panels = (function () {
     }
 
     const voice = group(C().inst.gVoice, "voice");
-    if (eng === "sub") patchKnob(voice.row, tr, "drive", { label: C().inst.drive, tip: "drive", min: 0, max: 1, fmt: fmtPct });
+    if (eng === "sub" || eng === "pluck") patchKnob(voice.row, tr, "drive", { label: C().inst.drive, tip: "drive", min: 0, max: 1, fmt: fmtPct });
     patchKnob(voice.row, tr, "gain", { label: C().inst.gain, tip: "gain", min: 0, max: 1.2, fmt: fmtPct });
     bodyEl.appendChild(voice.g);
 
     const sends = group(C().inst.gSends, "sends");
-    for (const [k, label] of Object.entries(C().sends)) {
-      const kn = MDS.ui.knob({
-        label, tip: "send" + { dist: "Dist", chorus: "Chor", delay: "Delay", verb: "Verb", crush: "Crush" }[k],
-        min: 0, max: 1, value: tr.sends[k], fmt: fmtPct, small: true,
-        onInput: (v) => { tr.sends[k] = v; S().applyMixer(); },
-      });
-      sends.row.appendChild(kn.el);
-    }
+    sendKnobRow(sends.row, tr);
     bodyEl.appendChild(sends.g);
   }
 
@@ -242,16 +273,7 @@ MDS.ui.panels = (function () {
       s.onclick = () => { tr.solo = !tr.solo; S().applyMixer(); MDS.bus.emit("mix"); };
       ms.append(m, s);
       const sends = document.createElement("div"); sends.className = "sends";
-      const sendKnobs = {};
-      for (const [k, label] of Object.entries(C().sends)) {
-        const kn = MDS.ui.knob({
-          label, tip: "send" + { dist: "Dist", chorus: "Chor", delay: "Delay", verb: "Verb", crush: "Crush" }[k],
-          min: 0, max: 1, value: tr.sends[k], fmt: fmtPct, small: true,
-          onInput: (v) => { tr.sends[k] = v; S().applyMixer(); },
-        });
-        sends.appendChild(kn.el);
-        sendKnobs[k] = kn;
-      }
+      const sendKnobs = sendKnobRow(sends, tr);
       strip.append(nm, lvl.el, ms, sends);
       mixer.appendChild(strip);
       mixerRefs.push({ tr, m, s, lvl, sendKnobs });
@@ -337,26 +359,99 @@ MDS.ui.panels = (function () {
 
   /* ── LIBRARY tab ───────────────────────────────────────────────────── */
   let libCat = "all";
+  let infoOpen = null;   // library entry id whose lore panel is expanded
+
+  function assignBtn(e) {
+    const use = document.createElement("button"); use.textContent = C().lib.assign; use.dataset.tt = "libAssign";
+    use.onclick = (ev) => {
+      ev.stopPropagation();
+      S().assignSound(S().sel.track, e.id);
+      MDS.ui.toast(C().lib.assigned(C().libNames[e.id] || e.name || e.id, C().tracks[S().project.tracks[S().sel.track].key]));
+      renderLib();
+    };
+    return use;
+  }
+
+  /* Lore panel under a library item: where the sound comes from in the real
+     world, glossary cross-refs, and a link out (CONTENT.libInfo owns copy). */
+  function infoPanel(e) {
+    const info = C().libInfo[e.id];
+    const box = document.createElement("div");
+    box.className = "lib-info";
+    const txt = document.createElement("p"); txt.textContent = info.text;
+    const foot = document.createElement("div"); foot.className = "li-foot";
+    for (const term of info.terms || []) {
+      const t = document.createElement("button");
+      t.className = "li-term"; t.textContent = term;
+      t.onclick = () => MDS.ui.glossary.open(term);
+      foot.appendChild(t);
+    }
+    const a = document.createElement("a");
+    a.className = "li-wiki"; a.textContent = C().lib.infoWiki;
+    a.href = info.wiki; a.target = "_blank"; a.rel = "noopener noreferrer";
+    foot.appendChild(a);
+    box.append(txt, foot);
+    return box;
+  }
+
   function renderLib() {
+    // The panel body is the scroll container and this tab rebuilds itself on
+    // every interaction; without this, clicking ⓘ or USE ON TRACK below the
+    // fold snaps the panel back to the top.
+    const scrollTop = bodyEl.scrollTop;
     bodyEl.innerHTML = "";
 
-    /* demo tracks */
+    /* demo tracks (compact cards: header row + blurb) */
     const dh = document.createElement("h3"); dh.textContent = C().lib.demosTitle;
     bodyEl.appendChild(dh);
     for (const id of MDS.demos.ids()) {
       const card = document.createElement("div");
       card.className = "demo-card";
+      const head = document.createElement("div"); head.className = "d-head";
       const nm = document.createElement("strong"); nm.textContent = C().demos[id].name;
-      const bl = document.createElement("div"); bl.className = "d-desc"; bl.textContent = C().demos[id].blurb;
-      const btns = document.createElement("div"); btns.className = "d-btns";
+      const grow = document.createElement("span"); grow.className = "grow";
       const play = document.createElement("button"); play.textContent = C().lib.demoPlay; play.dataset.tt = "demoPlay";
       play.onclick = () => loadDemo(id, true);
       const open = document.createElement("button"); open.textContent = C().lib.demoLoad; open.dataset.tt = "demoLoad";
       open.onclick = () => loadDemo(id, false);
-      btns.append(play, open);
-      card.append(nm, bl, btns);
+      head.append(nm, grow, play, open);
+      const bl = document.createElement("div"); bl.className = "d-desc"; bl.textContent = C().demos[id].blurb;
+      card.append(head, bl);
       bodyEl.appendChild(card);
     }
+
+    /* imported samples (the space the old demo cards used to fill) */
+    const sh = document.createElement("h3"); sh.textContent = C().lib.samplesTitle;
+    const sHint = document.createElement("div"); sHint.className = "seq-help"; sHint.textContent = C().lib.samplesHint;
+    const imp = document.createElement("button");
+    imp.textContent = C().lib.import; imp.dataset.tt = "libImport";
+    const fileIn = document.createElement("input");
+    fileIn.type = "file"; fileIn.accept = "audio/*"; fileIn.multiple = true; fileIn.hidden = true;
+    imp.onclick = () => fileIn.click();
+    fileIn.onchange = () => { importFiles(Array.from(fileIn.files)); fileIn.value = ""; };
+    const sList = document.createElement("div"); sList.className = "lib-list";
+    const samples = S().samples;
+    if (!samples.length) {
+      const empty = document.createElement("div"); empty.className = "seq-help";
+      empty.textContent = C().lib.samplesEmpty;
+      sList.appendChild(empty);
+    }
+    for (const smp of samples) {
+      const e = MDS.lib.get(smp.id);
+      const item = document.createElement("div");
+      item.className = "lib-item"; item.dataset.tt = "sampleItem";
+      item.classList.toggle("is-cur", S().project.tracks[S().sel.track].soundId === smp.id);
+      const nm = document.createElement("span"); nm.className = "l-name"; nm.textContent = smp.name;
+      const tags = document.createElement("span"); tags.className = "l-tags";
+      tags.textContent = C().lib.sampleSecs(smp.secs || 0);
+      const del = document.createElement("button");
+      del.className = "l-x"; del.textContent = C().lib.remove; del.dataset.tt = "sampleRemove";
+      del.onclick = (ev) => { ev.stopPropagation(); S().removeSample(smp.id); renderLib(); };
+      item.onclick = () => { if (e) previewEntry(e); };
+      item.append(nm, tags, assignBtn({ id: smp.id, name: smp.name }), del);
+      sList.appendChild(item);
+    }
+    bodyEl.append(sh, sHint, imp, fileIn, sList);
 
     /* sound browser */
     const lh = document.createElement("h3"); lh.textContent = C().lib.title;
@@ -380,18 +475,52 @@ MDS.ui.panels = (function () {
       nm.textContent = C().libNames[e.id] || e.id;
       const tags = document.createElement("span"); tags.className = "l-tags";
       tags.textContent = e.tags.join(" · ");
-      const use = document.createElement("button"); use.textContent = C().lib.assign; use.dataset.tt = "libAssign";
-      use.onclick = (ev) => {
-        ev.stopPropagation();
-        S().assignSound(S().sel.track, e.id);
-        MDS.ui.toast(C().lib.assigned(C().libNames[e.id] || e.id, C().tracks[S().project.tracks[S().sel.track].key]));
-        renderLib();
-      };
       item.onclick = () => previewEntry(e);
-      item.append(nm, tags, use);
+      item.append(nm, tags);
+      if (C().libInfo[e.id]) {
+        const inf = document.createElement("button");
+        inf.className = "l-info"; inf.textContent = C().lib.infoBtn; inf.dataset.tt = "libInfo";
+        inf.classList.toggle("is-on", infoOpen === e.id);
+        inf.onclick = (ev) => { ev.stopPropagation(); infoOpen = infoOpen === e.id ? null : e.id; renderLib(); };
+        item.appendChild(inf);
+      }
+      item.appendChild(assignBtn(e));
       list.appendChild(item);
+      if (infoOpen === e.id && C().libInfo[e.id]) list.appendChild(infoPanel(e));
     }
     bodyEl.append(lh, hint, cats, list);
+    bodyEl.scrollTop = scrollTop;
+  }
+
+  /* Import: base64 for the project file, one decode for duration + cache.
+     The base64 copy is made FIRST: decodeAudioData detaches its buffer.
+     Two caps: per file, and in total (samples are held as base64 AND as a
+     decoded AudioBuffer, and SAVE stringifies all of them at once). */
+  const MAX_SAMPLE_BYTES = 8 * 1024 * 1024;
+  const MAX_TOTAL_BYTES = 24 * 1024 * 1024;
+  function importFiles(files) {
+    const audio = S().ensureAudio();
+    let total = S().samples.reduce((n, s) => n + s.data.length * 0.75, 0);
+    for (const f of files) {
+      if (f.size > MAX_SAMPLE_BYTES) { MDS.ui.toast(C().lib.sampleTooBig(f.name)); continue; }
+      if (total + f.size > MAX_TOTAL_BYTES) { MDS.ui.toast(C().lib.samplesFull(f.name)); continue; }
+      total += f.size;
+      f.arrayBuffer().then((ab) => {
+        const bytes = new Uint8Array(ab);
+        let bin = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        }
+        const data = btoa(bin);
+        return audio.ctx.decodeAudioData(ab).then((buf) => {
+          const name = f.name.replace(/\.[^.]+$/, "");
+          const rec = S().addSample({ name, mime: f.type || "audio/*", data, secs: buf.duration });
+          MDS.lib.cacheBuffer(rec.id, buf);
+          MDS.ui.toast(C().lib.sampleAdded(name));
+          renderLib();
+        });
+      }).catch(() => MDS.ui.toast(C().lib.sampleBad(f.name)));
+    }
   }
 
   function previewEntry(e) {
@@ -435,7 +564,15 @@ MDS.ui.panels = (function () {
     root.append(tabs, bodyEl);
     showTab("inst");
 
-    MDS.bus.on("sel", () => { if (curTab === "inst" || curTab === "lib") renderers[curTab](); });
+    /* sel also fires for key changes, scale-lock toggles and per-tick wheel
+       note nudges; these tabs only depend on WHICH track is selected, so a
+       sel that kept the same track must not tear the whole tab down. */
+    let lastSelTrack = S().sel.track;
+    MDS.bus.on("sel", () => {
+      if (S().sel.track === lastSelTrack) return;
+      lastSelTrack = S().sel.track;
+      if (curTab === "inst" || curTab === "lib") renderers[curTab]();
+    });
     MDS.bus.on("patch", () => { if (curTab === "inst") renderInst(); });
     MDS.bus.on("mix", () => { if (curTab === "mixer") refreshMixer(); });
     // keep the FX/MASTER volume in step with the transport fader
@@ -444,7 +581,7 @@ MDS.ui.panels = (function () {
         masterFader.set(S().project.master.vol, false);
       }
     });
-    MDS.bus.on("project", () => renderers[curTab]());
+    MDS.bus.on("project", () => { lastSelTrack = S().sel.track; renderers[curTab](); });
   }
 
   return { init, showTab, highlightGroup };

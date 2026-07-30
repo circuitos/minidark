@@ -79,6 +79,13 @@ MDS.state = (function () {
   const state = {
     project: defaultProject(),
     playMode: "pattern", // 'pattern' | 'song'
+    tipsOn: true,        // hover/alt help text (session pref; app keeps no storage)
+    /* IMPORTED SAMPLES: [{id, name, mime, data(base64), secs}]. Deliberately
+       OUTSIDE `project`: undo snapshots stringify the project on every
+       gesture, and megabytes of base64 in every snapshot would make both
+       the diff and the stack explode. Samples ride along in the project
+       FILE only (toJSON/loadJSON below) and are not undoable. */
+    samples: [],
     sel: {
       track: 4,          // start on BASS — the genre's front door
       pattern: 0,
@@ -101,9 +108,24 @@ MDS.state = (function () {
       const graph = MDS.graph.build(ctx);
       MDS.graph.apply(graph, state.project);
       state.audio = { ctx, graph };
+      state.hydrateBuffers();
     }
     if (state.audio.ctx.state === "suspended") state.audio.ctx.resume();
     return state.audio;
+  };
+
+  /* Fill in the AudioBuffer of any sample-backed track patch that lacks one
+     (project opened before power-on, undo snapshot restored, etc.). */
+  state.hydrateBuffers = function () {
+    if (!state.audio) return;
+    for (const tr of state.project.tracks) {
+      const p = tr.patch;
+      if (!p || p.engine !== "buffer" || (p.buffer && p.buffer.length)) continue;
+      const id = p._pendingId || tr.soundId;
+      MDS.lib.resolve(state.audio.ctx, id)
+        .then((buf) => { p.buffer = buf; })
+        .catch(() => { p.buffer = null; }); // sample gone: row degrades to silence
+    }
   };
 
   /* ── Note entry ────────────────────────────────────────────────────────
@@ -128,6 +150,42 @@ MDS.state = (function () {
     if (state.audio) MDS.graph.applyMixer(state.audio.graph, state.project);
   };
 
+  /* ── Imported samples ─────────────────────────────────────────────────
+     One owner for the sample list: every import/remove goes through here so
+     the library registry and the saved project file never drift apart.
+     rec: { name, mime, data(base64), secs }. Returns the registered record. */
+  let sampleSeq = 0;
+  function sampleEntry(rec) {
+    return {
+      id: rec.id, name: rec.name, category: "user", tags: ["sample"],
+      baseNote: 60, // repitched around middle C by the buffer voice
+      source: { type: "base64", mime: rec.mime, data: rec.data },
+    };
+  }
+  state.addSample = function (rec) {
+    sampleSeq++;
+    const r = { id: "u" + sampleSeq, name: rec.name || ("sample " + sampleSeq),
+      mime: rec.mime || "audio/*", data: rec.data, secs: rec.secs || 0 };
+    state.samples.push(r);
+    MDS.lib.registerUser(sampleEntry(r));
+    return r;
+  };
+  state.removeSample = function (id) {
+    const i = state.samples.findIndex((s) => s.id === id);
+    if (i < 0) return;
+    state.samples.splice(i, 1);
+    MDS.lib.unregisterUser(id);
+  };
+  function registerSamples(list) {
+    for (const s of state.samples) MDS.lib.unregisterUser(s.id);
+    state.samples = list || [];
+    for (const s of state.samples) {
+      MDS.lib.registerUser(sampleEntry(s));
+      const n = parseInt(String(s.id).slice(1), 10);
+      if (n > sampleSeq) sampleSeq = n; // new imports must not collide
+    }
+  }
+
   /* Assign a library sound to a track (deep copy; async fill for buffers). */
   state.assignSound = function (trackIdx, soundId) {
     const tr = state.project.tracks[trackIdx];
@@ -136,7 +194,10 @@ MDS.state = (function () {
     const entry = MDS.lib.get(soundId);
     if (entry && entry.baseNote != null) tr.baseNote = entry.baseNote;
     if (tr.patch && tr.patch.engine === "buffer" && state.audio) {
-      MDS.lib.resolve(state.audio.ctx, soundId).then((buf) => { tr.patch.buffer = buf; });
+      // Capture the patch object: re-reading tr.patch at resolve time would
+      // let a slow decode overwrite whatever sound was assigned meanwhile.
+      const p = tr.patch;
+      MDS.lib.resolve(state.audio.ctx, soundId).then((buf) => { p.buffer = buf; });
     }
     MDS.bus.emit("patch");
   };
@@ -188,6 +249,14 @@ MDS.state = (function () {
         patch.r = rndExp(0.02, 1.4);
         patch.gain = rnd(0.4, 0.8);
         break;
+      case "pluck":
+        patch.decay = rnd(0.05, 1);
+        patch.bright = rnd(0, 1);
+        patch.pick = rnd(0, 1);
+        patch.body = rnd(0, 1);
+        patch.drive = chance(0.45) ? 0 : rnd(0.05, 0.9);
+        patch.gain = rnd(0.45, 0.9);
+        break;
       case "drum":
         patch.dTune = rnd(0.55, 1.9);
         patch.dDecay = rnd(0.05, 1);
@@ -212,14 +281,17 @@ MDS.state = (function () {
     return tr.patch;
   };
 
-  /* ── Persistence (file-based; see EXPORT dialog) ── */
+  /* ── Persistence (file-based; see EXPORT dialog) ──
+     Imported samples travel inside the project file (there is nowhere else:
+     the app keeps no storage) but outside `project`, so undo stays light. */
   state.toJSON = function () {
-    return JSON.stringify({ v: 1, project: state.project }, null, 1);
+    return JSON.stringify({ v: 1, project: state.project, samples: state.samples }, null, 1);
   };
 
   state.loadJSON = function (text) {
     const data = JSON.parse(text);
     if (!data || data.v !== 1 || !data.project) throw new Error("bad-project-file");
+    registerSamples(data.samples || []);
     state.loadProject(data.project);
   };
 
@@ -228,14 +300,38 @@ MDS.state = (function () {
   state.loadProject = function (p, opts) {
     const base = defaultProject();
     const proj = Object.assign(base, p);
+    // fx/master need the same defensive treatment as tracks below: the top
+    // level Object.assign replaces them wholesale, so a partial object from
+    // an old or hand-edited file would crash graph.apply later.
+    const fresh = defaultProject();
+    proj.fx = {};
+    for (const k of Object.keys(fresh.fx)) {
+      proj.fx[k] = Object.assign(fresh.fx[k], (p.fx || {})[k] || {});
+    }
+    proj.master = Object.assign(fresh.master, p.master || {});
     proj.tracks = base.tracks.map((bt, i) => {
       const src = (p.tracks && p.tracks[i]) || {};
       const t = Object.assign(bt, src);
       t.sends = Object.assign({ dist: 0, chorus: 0, delay: 0, verb: 0, crush: 0 }, src.sends || {});
       if (!t.patch) t.patch = MDS.lib.materialize(t.soundId);
+      // An AudioBuffer never survives JSON (undo snapshot or project file):
+      // it stringifies to {}. Re-take it from the decode cache, keeping the
+      // user's knob values from the serialized patch.
+      if (t.patch && t.patch.engine === "buffer") {
+        const fresh = MDS.lib.materialize(t.soundId);
+        if (fresh && fresh.engine === "buffer") {
+          const saved = t.patch;
+          t.patch = Object.assign(fresh, saved, { buffer: fresh.buffer, _pendingId: fresh._pendingId });
+        } else {
+          t.patch.buffer = null; // sample no longer registered
+        }
+      }
       return t;
     });
     while (proj.patterns.length < 8) proj.patterns.push(emptyPattern());
+    // ...and never more: the bank has 8 slots, so extras from a foreign file
+    // would be unreachable yet ride in every undo snapshot.
+    if (proj.patterns.length > 8) proj.patterns.length = 8;
     state.project = proj;
     // keepView: an undo step restores the music, not where you were looking
     // (and not the notes you had chosen per row, which outlive the edit)
@@ -245,6 +341,7 @@ MDS.state = (function () {
       state.playMode = proj.song.length ? "song" : "pattern";
     }
     state.applyAudio();
+    state.hydrateBuffers();
     MDS.bus.emit("project");
   };
 
