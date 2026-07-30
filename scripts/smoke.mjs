@@ -111,6 +111,40 @@ for (const id of MDS.demos.ids()) {
   ok("sequencer: cell.len scales note duration (a held pad outlasts its attack)");
 }
 
+/* ── song seek: cue while stopped, jump while playing kills booked voices ── */
+{
+  const S = MDS.state;
+  const stub = sandbox.MDS.synth;
+  let kills = 0;
+  sandbox.MDS.synth = { trigger() {}, killAll() { kills++; } };
+  sandbox.setInterval = () => 0;   // start()'s wake timer; loop() runs by hand
+  sandbox.clearInterval = () => {};
+  const saveSong = S.project.song.slice(), saveMode = S.playMode;
+  S.project.song = [0, 1, 2, 3, 4];
+  S.playMode = "song";
+  S.audio = { ctx: { currentTime: 0 }, graph: {} };
+  MDS.seq.seekSong(3);                       // cue while stopped
+  assert(MDS.seq.songPos === 3, "stopped seek did not set songPos");
+  MDS.seq.start();
+  assert(MDS.seq.songPos === 3, "start() clobbered a stopped cue");
+  let ticks = MDS.seq.drainTicks(99);
+  assert(ticks.length && ticks[0].songPos === 3 && ticks[0].step === 0,
+    "playback did not begin at the cued bar");
+  MDS.seq.seekSong(1);                       // live jump
+  assert(kills === 1, "a live seek must kill already-booked voices");
+  assert(MDS.seq.songPos === 1, "live seek did not move songPos");
+  ticks = MDS.seq.drainTicks(99);
+  assert(ticks.length && ticks[0].songPos === 1 && ticks[0].step === 0,
+    "live seek did not rebook from the new bar");
+  MDS.seq.seekSong(12);                      // wraps like the song loop
+  assert(MDS.seq.songPos === 2, `seek past the end landed on ${MDS.seq.songPos} (want 2)`);
+  MDS.seq.stop();
+  assert(MDS.seq.songPos === 0, "STOP must rewind the song to the top");
+  S.project.song = saveSong; S.playMode = saveMode; S.audio = null;
+  sandbox.MDS.synth = stub;
+  ok("sequencer: seekSong cues stopped, jumps live (killing booked voices), wraps, STOP rewinds");
+}
+
 /* ── randomizer stays inside what the voices can render ────────────────── */
 {
   let rolls = 0, changed = 0;

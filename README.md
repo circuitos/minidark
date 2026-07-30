@@ -38,7 +38,8 @@ touched a synthesizer.
   glue-compressed, limited master bus so beginners can't clip.
 - **16-step sequencer**, 8 tracks, accents, note lengths (drag a melody step
   right to hold it), 8-pattern bank, undo/redo, song mode
-  (chains 30+ bars), scale lock, swing, lookahead scheduling on the audio
+  (chains 30+ bars, with a ▶ cue under each block that plays the song from
+  that bar), scale lock, swing, lookahead scheduling on the audio
   clock (no drift).
 - **Playable keyboard** (mouse/touch + QWERTY) over the running sequencer.
 - **RANDOMIZE** on every instrument: rerolls each dial inside ranges the voice

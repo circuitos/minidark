@@ -427,8 +427,9 @@ MDS.ui.seq = (function () {
       return;
     }
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el || !el.classList.contains("chip")) return;
-    const to = +el.dataset.pos;
+    const slot = el && el.closest ? el.closest(".chip-slot") : null;
+    if (!slot) return;
+    const to = +slot.dataset.pos;
     const song = S().project.song;
     if (!Number.isInteger(to) || to === grab.pos || to >= song.length) return;
     song.splice(to, 0, song.splice(grab.pos, 1)[0]);
@@ -448,6 +449,16 @@ MDS.ui.seq = (function () {
     if (held) refreshSong();
   }
 
+  /* Jump live playback to chain position `pos` (the ▶ cue under each chip).
+     Flips to SONG mode first (a song position is inaudible in pattern mode)
+     and starts the transport when it is not already running. */
+  function jumpToBar(pos) {
+    S().ensureAudio();
+    if (S().playMode !== "song") { S().playMode = "song"; els.syncMode(); }
+    MDS.seq.seekSong(pos);
+    if (!MDS.seq.playing) MDS.seq.start();
+  }
+
   function refreshSong() {
     const song = S().project.song;
     els.chain.innerHTML = "";
@@ -457,9 +468,10 @@ MDS.ui.seq = (function () {
       els.chain.appendChild(e);
     }
     song.forEach((pIdx, i) => {
+      const slot = document.createElement("span");
+      slot.className = "chip-slot"; slot.dataset.pos = String(i);
       const chip = document.createElement("span");
       chip.className = "chip"; chip.textContent = String(pIdx + 1);
-      chip.dataset.pos = String(i);
       if (S().tipsOn !== false) chip.title = C().seq.chipHint; // native hover help obeys HINTS too
       if (grab && grab.pos === i) chip.classList.add("is-grabbed");
       chip.onpointerdown = (e) => { if (e.button === 0) armChipGrab(i, e); };
@@ -470,7 +482,15 @@ MDS.ui.seq = (function () {
         else song.splice(i, 1);
         MDS.bus.emit("song");
       };
-      els.chain.appendChild(chip);
+      // The jump cue is its OWN element under the chip, so it cannot collide
+      // with the chip's remove / duplicate / hold-to-drag gestures.
+      const jump = document.createElement("button");
+      jump.className = "chip-jump"; jump.dataset.tt = "songJump";
+      jump.textContent = C().seq.chipJump;
+      if (S().tipsOn !== false) jump.title = C().tooltips.songJump.what;
+      jump.onclick = () => jumpToBar(i);
+      slot.append(chip, jump);
+      els.chain.appendChild(slot);
     });
     const secs = Math.round(song.length * 16 * MDS.seq.stepDur(S().project));
     els.songLen.textContent = C().seq.songLen(song.length, secs);

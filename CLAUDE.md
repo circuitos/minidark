@@ -119,7 +119,10 @@ Run all three check scripts before declaring any change done.
   each amp (same rationale as the `adsr()` gotcha above) so booked-but-unplayed
   notes cannot fire after STOP. Keyboard notes and previews are deliberately
   unregistered; a new way to schedule notes should go through `trigger` or
-  register itself.
+  register itself. `seq.seekSong()` (the ▶ cue under each song chip) does the
+  same kill before rebooking, so a live jump cannot bleed the old bar's booked
+  notes. Related invariant: `stop()`, not `start()`, rewinds `songPos` to 0,
+  which is what lets a seek made while stopped survive into the next PLAY.
 - The INSTRUMENT and LIBRARY tabs skip re-rendering on `sel` events that keep
   the same selected track (wheel note nudges emit `sel` per tick). If those
   tabs ever grow UI that depends on other `sel` state (key, octave, entry

@@ -332,17 +332,33 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 /* ── Song mode ────────────────────────────────────────────────────────── */
 .song-box { display: flex; flex-direction: column; gap: var(--sp-2); }
 
-/* One continuous strip: the chain reads left to right like tape. Chips share
+/* One continuous strip: the chain reads left to right like tape. Slots share
    the available width equally and shrink to fit, so a long song needs no
-   scrollbar and never wraps into a clipped second line. */
+   scrollbar and never wraps into a clipped second line. Each slot stacks a
+   pattern chip over its ▶ jump cue: the cue is a separate control so the
+   chip's remove / duplicate / drag gestures stay untouched. */
 .chain {
   display: flex; flex-wrap: nowrap; gap: var(--sp-1);
   min-height: var(--sp-5); overflow: hidden;
 }
+.chain .chip-slot {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; gap: var(--sp-1);
+}
 .chain .chip {
-  flex: 1 1 0; min-width: 0; padding: var(--sp-1);
+  min-width: 0; padding: var(--sp-1);
   justify-content: center; text-align: center;
   touch-action: pan-y;   /* vertical scroll stays the page's, sideways is ours */
+}
+/* The jump cue: a thin locate strip that plays the song from its bar. */
+.chain .chip-jump {
+  min-width: 0; min-height: 0; overflow: hidden;
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-xs); line-height: 1.5;
+  color: var(--c-ink2); background: var(--c-bg0);
+}
+.chain .chip-jump:hover {
+  color: var(--c-accent); border-color: var(--c-accent); background: var(--c-bg3);
 }
 /* Held block: lifted out of the chain while it is being repositioned. */
 .chain .chip.is-grabbed {

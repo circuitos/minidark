@@ -102,7 +102,9 @@ MDS.seq = (function () {
     if (playing) return;
     const ctx = MDS.state.audio.ctx;
     playing = true;
-    step = 0; songPos = 0;
+    step = 0;
+    // songPos is NOT reset here: stop() rewinds it, so a cue set with
+    // seekSong() while stopped survives into this start.
     lastNotes.fill(null);
     tickQueue.length = 0;
     nextTime = ctx.currentTime + 0.06;
@@ -115,11 +117,30 @@ MDS.seq = (function () {
     playing = false;
     clearInterval(timer); timer = null;
     tickQueue.length = 0;
+    songPos = 0;   // rewind: the next PLAY starts the song at the top
     // Silence already-booked voices (up to AHEAD in the future) and ringing
     // tails; live keyboard notes are unregistered and keep sounding.
     // (Guarded: the smoke test stubs MDS.synth with trigger only.)
     const audio = MDS.state.audio;
     if (audio && MDS.synth.killAll) MDS.synth.killAll(audio.graph, audio.ctx.currentTime + 0.001);
+  }
+
+  /* Jump the song to chain position `pos` (wraps, bar-aligned). Stopped: just
+     cue it for the next start. Playing: the old position's booked-but-unplayed
+     voices must not bleed into the new one, so they are killed the same way
+     STOP kills them, then the schedule rebooks from the new bar. */
+  function seekSong(pos) {
+    const len = MDS.state.project.song.length;
+    if (!len) return;
+    songPos = ((Math.floor(pos) % len) + len) % len;
+    step = 0;
+    if (!playing) return;
+    const audio = MDS.state.audio;
+    if (!audio) return;
+    if (MDS.synth.killAll) MDS.synth.killAll(audio.graph, audio.ctx.currentTime + 0.001);
+    tickQueue.length = 0;   // queued ticks describe steps that were just killed
+    nextTime = audio.ctx.currentTime + 0.06;
+    loop();
   }
 
   function toggle() { playing ? stop() : start(); }
@@ -135,7 +156,7 @@ MDS.seq = (function () {
   return {
     get playing() { return playing; },
     get songPos() { return songPos; },
-    start, stop, toggle, drainTicks,
+    start, stop, toggle, seekSong, drainTicks,
     scheduleStep, stepDur, songBars,
   };
 })();

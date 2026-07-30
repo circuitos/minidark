@@ -61,6 +61,7 @@ MDS.CONTENT = {
     songEmpty: "Song is empty. Add patterns to build a track (30+ bars ≈ one minute).",
     songLen: (bars, secs) => `${bars} bars ≈ ${secs}s`,
     chipHint: "click to remove · shift-click to duplicate · hold, then drag to move it along the song",
+    chipJump: "▶",
   },
 
   confirm: {
@@ -326,7 +327,8 @@ MDS.CONTENT = {
     stepGrid: { what: "Each row is a track, each square a 16th-note step. Click to turn a step on; on melody rows, drag right to hold one note over several steps.", why: "Drum machines made this grid famous; whole genres live inside these 16 squares. Slow sounds like pads only bloom if you hold them: a single 16th ends before the attack has opened." },
     trackSelect: { what: "Selects this track; the keyboard and INSTRUMENT panel follow your selection.", why: "Tweak one voice at a time; the selected track is the one you're sculpting." },
     trackMuteMini: { what: "Silences this track (M) or plays it alone (S).", why: "Muting parts in and out is the fastest way to hear what each one contributes." },
-    songChain: { what: "The order your patterns play in SONG mode. Click a block to remove it.", why: "Arrangement is just a list: low-energy patterns first, add layers, strip back, end." },
+    songChain: { what: "The order your patterns play in SONG mode. Click a block to remove it; the ▶ under a block plays the song from there.", why: "Arrangement is just a list: low-energy patterns first, add layers, strip back, end." },
+    songJump: { what: "Starts song playback from this bar, or jumps straight here if the song is already playing.", why: "Working on the ending should not cost you a listen through the whole intro every time." },
     songAdd: { what: "Appends the currently selected pattern to the song.", why: "Chain 30+ bars and you have a real one-minute-plus track to export." },
     songClear: { what: "Empties the song chain.", why: "Start the arrangement over without touching your patterns." },
 
