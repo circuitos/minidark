@@ -7,7 +7,13 @@
    Layout produced in <outDir> (default: _site):
      /                      tree of ROOT_BRANCH (the repo default branch)
      /previews/<slug>/      tree of every other branch (slug: "/" → "--")
-     /previews/index.html   generated listing (noindex), newest-first
+     /previews/index.html   generated listing of EVERY branch, trunk pinned
+                            first (links to the site root), then newest-first.
+                            Styled with the site's own tokens: it links
+                            trunk's css/theme.css and uses var() fallbacks
+                            that duplicate the anchor palette, so it stays
+                            dark even if the root tree is ever absent (same
+                            precedent as the favicon in index.html).
      /.nojekyll             stop Pages running Jekyll
      /robots.txt            Disallow: /previews/
 
@@ -89,25 +95,92 @@ function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function previewIndex(previews) {
-  const rows = previews.map((p) =>
-    `<li><a href="./${esc(p.slug)}/">${esc(p.branch)}</a>` +
-    ` <code>${p.sha.slice(0, 7)}</code> <small>${esc(p.date)}</small>` +
-    ` <span>${esc(p.subject)}</span></li>`
-  ).join("\n");
+/* The listing page for /previews/: every branch, trunk pinned first.
+   Design tokens come from trunk's css/theme.css; the var() fallbacks below
+   duplicate the anchor palette (bg0/bg1/ink/accents, see css/theme.css) so
+   the page still reads dark if that stylesheet is missing. Update them by
+   hand when the palette changes, like the index.html favicon. */
+function previewIndex(trunk, previews) {
+  const stamp = trunk ? `?v=${trunk.sha.slice(0, 12)}` : "";
+  const row = (href, name, badge, sha, date, subject) =>
+    `<li><a class="br" href="${href}">` +
+    `<span class="name">${esc(name)}</span>` +
+    (badge ? `<span class="badge">${esc(badge)}</span>` : "") +
+    `<code>${esc(sha.slice(0, 7))}</code>` +
+    `<span class="date">${esc(date.slice(0, 16))}</span>` +
+    `<span class="subj">${esc(subject)}</span>` +
+    `</a></li>`;
+  const rows = [
+    ...(trunk ? [row("../", trunk.branch, "root", trunk.sha, trunk.date, trunk.subject)] : []),
+    ...previews.map((p) => row(`./${esc(p.slug)}/`, p.branch, "", p.sha, p.date, p.subject)),
+  ].join("\n");
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>branch previews</title>
+<title>MINIDARK · branch previews</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230c0d10'/%3E%3Ccircle cx='8' cy='8' r='4' fill='none' stroke='%23e0483c' stroke-width='2'/%3E%3Cline x1='8' y1='8' x2='11' y2='5' stroke='%23e6e8ec' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../css/theme.css${stamp}">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--c-bg0, #0c0d10);
+  color: var(--c-ink0, #e6e8ec);
+  font-family: var(--font-ui, "Barlow", "Helvetica Neue", Helvetica, "Segoe UI", system-ui, Arial, sans-serif);
+  min-height: 100vh;
+}
+main {
+  max-width: 46rem; margin: 0 auto;
+  padding: var(--sp-6, 2.2rem) var(--sp-4, 1rem);
+  display: flex; flex-direction: column; gap: var(--sp-4, 1rem);
+}
+h1 {
+  font-size: var(--fs-l, 1.05rem); font-weight: 600;
+  letter-spacing: 0.24em; text-transform: uppercase;
+}
+/* inline-block: ::first-letter only takes effect on block-like boxes */
+h1 .logo { display: inline-block; }
+h1 .logo::first-letter { color: var(--c-accent, #e0483c); }
+h1 .sub { color: var(--c-ink2, #767c88); font-weight: 500; letter-spacing: var(--track-caps, 0.16em); }
+.note { color: var(--c-ink2, #767c88); font-size: var(--fs-s, 0.78rem); }
+ul { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2, 0.4rem); }
+.br {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--sp-1, 0.2rem) var(--sp-3, 0.65rem);
+  background: var(--c-bg1, #16171b);
+  border: var(--bw, 1px) solid var(--c-line, #2b2e35);
+  border-radius: var(--r-m, 5px);
+  padding: var(--sp-3, 0.65rem) var(--sp-4, 1rem);
+  color: inherit; text-decoration: none;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.br:hover { border-color: var(--c-accent2, #45a7e6); background: var(--c-bg2, #1e2025); }
+.name { font-weight: 600; overflow-wrap: anywhere; }
+.badge {
+  font-size: var(--fs-xs, 0.68rem); color: var(--c-accent, #e0483c);
+  border: var(--bw, 1px) solid var(--c-accent, #e0483c);
+  border-radius: var(--r-s, 3px); padding: 0 var(--sp-2, 0.4rem);
+  text-transform: uppercase; letter-spacing: var(--track-caps, 0.16em);
+}
+code, .date {
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: var(--fs-s, 0.78rem); color: var(--c-ink1, #9ba0aa);
+}
+.date { margin-left: auto; color: var(--c-ink2, #767c88); }
+.subj { flex-basis: 100%; color: var(--c-ink1, #9ba0aa); font-size: var(--fs-s, 0.78rem); }
+.empty { color: var(--c-ink2, #767c88); font-size: var(--fs-s, 0.78rem); padding: var(--sp-3, 0.65rem) 0; }
+</style>
 </head>
 <body>
-<h1>Branch previews</h1>
+<main>
+<h1><span class="logo">MINIDARK</span> <span class="sub">branch previews</span></h1>
+<p class="note">Every branch of the repo, live. The root branch deploys to the site root; every other branch previews here, newest first. Allow ~1 minute per push plus up to 10 minutes of Pages edge cache.</p>
 <ul>
-${rows || "<li>(no preview branches)</li>"}
+${rows || `<li class="empty">(no branches found)</li>`}
 </ul>
+</main>
 </body>
 </html>
 `;
@@ -142,7 +215,7 @@ for (const p of previews) {
 }
 
 mkdirSync(join(outDir, "previews"), { recursive: true });
-writeFileSync(join(outDir, "previews", "index.html"), previewIndex(previews));
+writeFileSync(join(outDir, "previews", "index.html"), previewIndex(trunk, previews));
 writeFileSync(join(outDir, ".nojekyll"), "");
 writeFileSync(join(outDir, "robots.txt"), "User-agent: *\nDisallow: /previews/\n");
 console.log(`composed ${previews.length} preview(s) into ${outDir}`);

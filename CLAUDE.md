@@ -41,6 +41,8 @@ Run all three check scripts before declaring any change done.
 
 - Trunk is `main` (repo default branch): it deploys to the site root.
   Every other branch auto-deploys to `/previews/<slug>/` (slug: `/` becomes `--`).
+  `/previews/` itself is a generated dark-styled listing of every branch,
+  trunk pinned first (linking to the site root), then newest-first.
 - `deploy-pages.yml` composes the whole site with `scripts/build-preview-site.mjs`
   and force-pushes it to `gh-pages` on every push. **`gh-pages` is generated
   output: never edit it, never branch from it.**
@@ -78,7 +80,10 @@ Run all three check scripts before declaring any change done.
   Node vm; a stray `document.` in ENGINE will fail CI (this is a feature).
 - The favicon in `index.html` duplicates three theme colors (bg0, accent,
   ink0) as a data URI; update it by hand when the palette changes (tokens
-  can't reach it).
+  can't reach it). The generated `/previews/` listing does the same twice
+  over in `scripts/build-preview-site.mjs`: the favicon data URI, plus
+  `var()` fallbacks that shadow the anchor palette (it links trunk's
+  `theme.css` but must stay dark without it).
 - Patch-knob changes apply per-note (next scheduled step), mixer/FX/master
   knobs apply live to the running graph. Both are intended.
 - A step's `len` (cell schema in `js/state.js`) is the only way to make a
