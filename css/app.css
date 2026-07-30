@@ -269,7 +269,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 .pat-bank button.is-cur { border-color: var(--c-accent2); color: var(--c-ink0); background: var(--c-bg3); }
 .pat-bank button.is-live { color: var(--c-accent); }
 
-/* Faint signal-grid matrix behind the steps. */
+/* Faint signal-grid matrix behind the steps. It can only line up inside each
+   4-step group: the beat gap shifts every group rightward, so past the first
+   beat it reads as texture, not as a ruler. Decided and accepted (audit
+   G1-7): it is a backdrop. */
 .grid-scroll { overflow-x: auto; border-radius: var(--r-m); padding: var(--sp-1) 0; }
 .grid {
   display: flex; flex-direction: column; gap: var(--cell-gap); width: max-content;
@@ -280,7 +283,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 }
 .grid-row { display: flex; align-items: center; gap: var(--cell-gap); }
 .row-head {
-  width: 6.6rem; flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-2);
+  width: var(--rowhead-w); flex-shrink: 0; display: flex; align-items: center; gap: var(--sp-2);
   border-radius: var(--r-s); padding: var(--sp-2); min-height: var(--cell-h);
   cursor: pointer; border: var(--bw) solid var(--c-line); background: var(--c-bg2);
   font-size: var(--fs-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em;
@@ -492,7 +495,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
 /* ── Step column LEDs ─────────────────────────────────────────────────── */
 .col-leds {
   display: flex; align-items: center; gap: var(--cell-gap);
-  margin-left: calc(6.6rem + var(--cell-gap)); margin-bottom: var(--sp-1);
+  margin-left: calc(var(--rowhead-w) + var(--cell-gap)); margin-bottom: var(--sp-1);
   width: max-content;
 }
 .col-led {

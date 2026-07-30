@@ -329,6 +329,9 @@ MDS.state = (function () {
       return t;
     });
     while (proj.patterns.length < 8) proj.patterns.push(emptyPattern());
+    // ...and never more: the bank has 8 slots, so extras from a foreign file
+    // would be unreachable yet ride in every undo snapshot.
+    if (proj.patterns.length > 8) proj.patterns.length = 8;
     state.project = proj;
     // keepView: an undo step restores the music, not where you were looking
     // (and not the notes you had chosen per row, which outlive the edit)

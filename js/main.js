@@ -122,36 +122,29 @@
     bar.append(logo, sub, nameIn, grow, undo, redo, save, openBtn, fileIn, reset, exp, les, glo, hints);
   }
 
+  /* RESET confirm rides the shared modal (Esc, backdrop-click, close button
+     come with it); Enter-to-confirm is this dialog's own addition, removed
+     again through the modal's onClose. */
   function confirmReset() {
     const cc = C().confirm;
-    const back = el("div", "modal-back");
-    const modal = el("div", "modal modal-sm");
-    const head = el("div", "modal-head");
-    head.appendChild(el("h2", null, cc.resetTitle));
-    const body = el("div", "modal-body");
-    body.appendChild(el("p", null, cc.resetBody));
-    const foot = el("div", "modal-foot");
-    const grow = el("span", "grow");
+    const onKey = (e) => { if (e.key === "Enter") { e.preventDefault(); ok.click(); } };
+    const m = MDS.ui.modal.open({
+      title: cc.resetTitle,
+      onClose: () => document.removeEventListener("keydown", onKey),
+    });
+    m.body.closest(".modal").classList.add("modal-sm");
+    m.body.appendChild(el("p", null, cc.resetBody));
     const cancel = el("button", null, cc.resetCancel);
     const ok = el("button", "btn-danger", cc.resetOk);
-    const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
-    cancel.onclick = close;
+    cancel.onclick = () => m.close();
     ok.onclick = () => {
       MDS.seq.stop();
       S().newProject();
-      close();
+      m.close();
       MDS.ui.toast(cc.resetDone);
     };
-    function onKey(e) {
-      if (e.key === "Escape") { e.preventDefault(); close(); }
-      else if (e.key === "Enter") { e.preventDefault(); ok.click(); }
-    }
     document.addEventListener("keydown", onKey);
-    back.onclick = (e) => { if (e.target === back) close(); };
-    foot.append(grow, cancel, ok);
-    modal.append(head, body, foot);
-    back.appendChild(modal);
-    document.body.appendChild(back);
+    m.foot.append(el("span", "grow"), cancel, ok);
     ok.focus();
   }
 

@@ -29,6 +29,7 @@ MDS.ui.keyboard = (function () {
   const heldOffsets = {};
   let keyEls = {};       // note → DOM key
   let root = null, nameEl = null;
+  let built = false;     // global listeners registered (see build)
 
   function baseC() { return 48 + S().sel.octave * 12; }  // C3 default
 
@@ -80,12 +81,7 @@ MDS.ui.keyboard = (function () {
     const hint = document.createElement("span");
     hint.className = "seq-help is-right"; hint.textContent = C().kbd.hint;
     /* Same cell rhythm as the transport and sequencer headers. */
-    const kCell = (...kids) => {
-      const d = document.createElement("div");
-      d.className = "hd-cell";
-      d.append(...kids);
-      return d;
-    };
+    const kCell = (...kids) => MDS.ui.cell("hd-cell", ...kids);
     head.append(kCell(title), kCell(down, up), kCell(nameEl), hint);
 
     const kb = document.createElement("div");
@@ -93,6 +89,12 @@ MDS.ui.keyboard = (function () {
     container.append(head, kb);
     container._kb = kb;
     render();
+
+    /* Global listeners and bus subscriptions register exactly once: a second
+       build() re-renders the DOM but must not double every note trigger
+       (the bus has no off() by design). */
+    if (built) return;
+    built = true;
 
     /* QWERTY handling (global) */
     document.addEventListener("keydown", (e) => {

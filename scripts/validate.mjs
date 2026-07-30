@@ -75,13 +75,20 @@ for (const id of MDS.demos.ids()) {
       fail(`demo "${id}" track "${tr.key}" has invalid patch`);
     }
   }
-  ok(`demo "${id}": ${p.song.length} bars ≈ ${Math.round(secs)}s, data well-formed`);
+  // the blurb states tempo and key; it must state the REAL ones (they have
+  // drifted apart from demos.js silently before this check existed)
+  const blurb = (C.demos[id] && C.demos[id].blurb) || "";
+  if (!blurb.includes(p.bpm + " BPM")) fail(`demo "${id}" blurb does not state its real tempo (${p.bpm} BPM)`);
+  if (!blurb.includes(p.key + " minor")) fail(`demo "${id}" blurb does not state its real key (${p.key} minor)`);
+  ok(`demo "${id}": ${p.song.length} bars ≈ ${Math.round(secs)}s, data well-formed, blurb in sync`);
 }
 
 /* ── lessons ↔ widgets ─────────────────────────────────────────────────── */
 const lessonsSrc = readFileSync("js/ui/lessons.js", "utf8");
 const widgetKeys = new Set();
-for (const m of lessonsSrc.matchAll(/^\s{4}(\w+)\(box\)\s*{/gm)) widgetKeys.add(m[1]);
+// any indentation: formatting must not be load-bearing (the `box` param name
+// IS the widget-builder contract, so that part stays exact)
+for (const m of lessonsSrc.matchAll(/^\s+([A-Za-z_$]\w*)\(box\)\s*{/gm)) widgetKeys.add(m[1]);
 for (const m of lessonsSrc.matchAll(/widgets\["([\w-]+)"\]/g)) widgetKeys.add(m[1]);
 if (C.lessons.length < 7) fail(`only ${C.lessons.length} lessons (spec: 7)`);
 for (const L of C.lessons) {

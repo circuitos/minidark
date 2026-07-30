@@ -54,42 +54,47 @@ Design decisions taken, per finding:
 
 None. All eleven were resolved in the follow-up pass above.
 
+## 1c. Fixed in the third pass (the low-severity backlog)
+
+| ID | Where | Resolution |
+|---|---|---|
+| F3 | `js/ui/knob.js` | Stroke-width token read once per session, not once per knob. |
+| F5 | `js/ui/meter.js` | GR column now calls `drawCol` (its peak branch no-ops, as verified). |
+| F6 | `js/ui/meter.js` | dB readout and clip class written only when the rendered string changes. |
+| F7 | `js/ui/meter.js` | Analyser tap keyed on the AudioContext, so a rebuilt context re-taps. |
+| F11 | `js/ui/exportui.js` | While lamejs is still loading, the open dialog polls and re-enables MP3 the moment it lands. |
+| F12 | `js/ui/exportui.js` | Re-entrancy guard (one dialog), and an in-flight render bails when the dialog closed mid-way. |
+| F16 | `js/ui/knob.js` + callers | One `MDS.ui.cell` helper replaces the four header-cell copies. |
+| F17 | `js/main.js` | confirmReset now rides `MDS.ui.modal.open`; Enter-to-confirm stays as its own documented addition, removed via onClose. |
+| F18 | composer + workflow | The slug rule lives only in `build-preview-site.mjs`; the PR-comment job calls its new `--slug` mode instead of carrying a copy. |
+| F21 | `js/engine/graph.js` | Reverb guard quantizes exactly like `makeIR`'s cache key; the two now agree on "changed". |
+| F23 | `js/engine/graph.js` | Dead `pre.gain` write removed; delay division map hoisted to a module const. |
+| F24 | `js/engine/graph.js` | Per-channel memo: applyMixer reschedules only params whose value actually changed. |
+| F26 | `js/ui/seq.js` | Play button written on play/stop transitions only, not per frame. |
+| F27 | `js/ui/seq.js`, `sequencer.js` | Dead `tick`/`transport` emits removed. |
+| F28 | `js/ui/seq.js` | `sel` events that keep the same track and pattern skip the 128-cell repaint; a wheel tick now repaints once (via `pattern`), not twice. |
+| F29 | `js/ui/seq.js` | Four delegated grid listeners replace 512 per-cell closures; row heads fall through untouched. |
+| F35 | `js/state.js` | loadProject truncates foreign files to the 8 reachable patterns. |
+| F38 | `js/ui/keyboard.js` | `build()` registers its global listeners exactly once (idempotent re-call). |
+| F41 | `js/ui/lessons.js` | drumgrid tracks its pending playhead timeouts and clears them on cleanup. |
+| F44 | `scripts/validate.mjs` | Widget scrape accepts any indentation; only the `box` param contract stays exact. |
+| F49 | `scripts/lint.mjs` | Hex matching restricted to real color lengths (3/4/6/8), ending `#faded`-style false failures. |
+| F51 | `deploy-pages.yml` | PR-comment job skips default-branch pushes (their PRs are closed by definition). |
+| G1-2 | `css/theme.css`, `app.css` | New `--rowhead-w` token owns the width; the col-LED offset derives from it. |
+| G1-4 | `css/theme.css` | Derived tokens (`--knob-fill`, `--meter-gr/hi/mid`, `--track-5`) now reference their anchors; `--meter-lo`'s green stays literal with a comment (equal to `--track-4` by coincidence, not meaning). |
+| G1-5 | `scripts/validate.mjs` | Demo blurbs are validated against the real bpm/key in demos.js, so they can no longer drift into lying. |
+| G1-6 | `js/demos.js` | `make(id)` throws a diagnosable `unknown-demo:` error. |
+| G1-7 | `css/app.css` | Decision recorded in the stylesheet: the signal-grid is a backdrop, not a ruler; alignment past the first beat group is accepted texture. |
+| G2-5 | `js/boot.js` | lamejs pinned with an SRI sha512 (computed from the npm 1.2.0 artifact cdnjs mirrors) + `crossorigin`; a tampered response now fails closed into the designed WAV-only fallback. |
+| G2-6 | `js/library.js` | `resolve()` returns a deep copy for synth sources, restoring the materialize() invariant. |
+| G2-8 | `js/engine/dsp.js` | Dead clamp removed (bit-identical output; `a` is always at least 0.05). |
+| G2-9 | `js/engine/sequencer.js` | tickQueue bounded at 128 (hidden-tab growth) and drained with one splice instead of shift-per-tick. |
+
 ## 3. Open, low severity
 
 | ID | Effort | Where | Finding |
 |---|---|---|---|
-| F3 | trivial | `js/ui/knob.js:39` | Per-knob `getComputedStyle` read of a constant token; hoist to module level. |
-| F5 | trivial | `js/ui/meter.js:206` | GR column re-implements `drawCol` math inline; the call would be exact. |
-| F6 | trivial | `js/ui/meter.js:210` | Per-frame readout string + class toggle written even when unchanged. |
-| F7 | small | `js/ui/meter.js:38` | Analyser tap never torn down; latent only (audio is never rebuilt today). |
-| F11 | small | `js/ui/exportui.js:62` | MP3 availability sampled once at dialog open; a late lamejs load stays disabled until reopen. |
-| F12 | small | `js/ui/exportui.js:34` | No re-entrancy guard: stacked EXPORT modals, stacked Escape listeners, async render writing into a detached log. |
-| F16 | small | `js/ui/seq.js`, `js/ui/keyboard.js` | The header-cell wrapper helper exists four times (three byte-identical). |
-| F17 | medium | `js/main.js:127` | confirmReset hand-rolls a modal; semi-deliberate (the generic modal lacks Enter-to-confirm), but the split should be intentional, not accidental. |
-| F18 | medium | `scripts/build-preview-site.mjs`, `deploy-pages.yml` | Slug rule duplicated between composer and PR-comment job; drift posts wrong URLs while the site deploys fine. |
-| F21 | trivial | `js/engine/graph.js:148` | Reverb hysteresis (0.02) and IR cache key rounding (0.05) quantize the same decision differently. |
-| F23 | trivial | `js/engine/graph.js:133` | Dead `pre.gain = 1` write per apply; `delaySeconds` allocates its map per call. |
-| F24 | medium | `js/engine/graph.js:167` | applyMixer reschedules all 56 params per knob pointermove. |
-| F26 | trivial | `js/ui/seq.js:475` | rAF loop writes the play label and toggles a class every frame even while stopped. |
-| F27 | trivial | `js/ui/seq.js:488` | `tick` and `transport` bus events have zero subscribers: dead extension points. |
-| F28 | medium | `js/ui/seq.js:332` | Full 128-cell repaint on `sel`, `pattern` and `mix`; a wheel tick repaints twice. Bounded by the fixed grid, so cheap today. |
-| F29 | small | `js/ui/seq.js:197` | 512 per-cell handler closures where one delegated grid listener would do. |
-| F35 | trivial | `js/state.js:319` | loadProject pads patterns to 8 but never truncates extras from foreign files. |
-| F36 | large | ~20 sites | 8-track/16-step constants hardcoded everywhere; `graph.NTRACKS` is exported but unused. Only worth touching if the grid ever grows. |
-| F38 | small | `js/ui/keyboard.js:90` | Listeners and bus subscriptions registered in build() with no removal path (bus has no `off`); safe because build runs once. |
-| F41 | trivial | `js/ui/lessons.js:262` | drumgrid playhead setTimeouts outlive cleanup and touch detached cells. |
-| F44 | small | `scripts/validate.mjs:84` | Widget scrape regex is coupled to exact 4-space indentation and a param named `box`; fails loud, but formatting should not be load-bearing. |
-| F49 | small | `scripts/lint.mjs:48` | Color regex over all JS makes any `#`+hex-like string (a DOM id, a URL fragment) a false-positive failure. |
-| F51 | small | `deploy-pages.yml:45` | PR-comment job runs on every push even with no open PR. |
-| G1-2 | small | `css/app.css:492` | `.col-leds` margin hardcodes `6.6rem`, silently coupled to `.row-head` width. |
-| G1-4 | small | `css/theme.css` | Anchor hexes repeated across tokens (e.g. `#45a7e6` four times) instead of `var()` references; a retint must find every copy. |
-| G1-5 | medium | `js/content.js:271` | Demo blurbs hardcode BPM/key that duplicate the authoritative fields in demos.js; retuning a demo makes the card lie. Could be validated or templated. |
-| G1-6 | small | `js/demos.js:242` | `demos.make(id)` indexes without a guard; unknown id throws an opaque TypeError. |
-| G1-7 | small | `css/app.css:276` | The signal-grid background can never align with cells past step 4 because beat gaps shift the rhythm it mimics. Cosmetic; decide whether the misalignment is acceptable texture. |
-| G2-5 | trivial | `js/boot.js:17` | lamejs script tag has no Subresource Integrity hash or crossorigin attribute. |
-| G2-6 | trivial | `js/library.js:211` | `resolve()` returns the live registry patch (no copy), undermining the invariant `materialize()` exists to protect. |
-| G2-8 | trivial | `js/engine/dsp.js:105` | `Math.min(1, 1 - a)` in makeIR is dead code (`a` is always >= 0.05). |
-| G2-9 | small | `js/engine/sequencer.js:21` | tickQueue is drained only by rAF, which pauses in hidden tabs while audio keeps pushing: unbounded growth during long background playback, then an O(n^2) shift-drain. |
+| F36 | large | ~20 sites | 8-track/16-step constants hardcoded everywhere; `graph.NTRACKS` is exported but unused. Deliberately deferred: 8x16 is a stable core product constant of this beginner app, and a 20-site churn buys nothing until the grid actually grows. Revisit only alongside a real grid-size feature. |
 
 ## 4. Refuted or accepted (do not re-report)
 

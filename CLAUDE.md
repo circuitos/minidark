@@ -168,3 +168,11 @@ Run all three check scripts before declaring any change done.
 Treat doc drift as a bug. If a change makes any statement in this file, the
 README, or AGENTS.md wrong, fixing the doc is part of the change. Append new
 hard-won lessons to Gotchas as you burn time on them.
+
+## Audits
+
+`AUDIT.md` tracks code health: fixed findings (with resolutions), the open
+backlog, and verified non-issues that must not be re-reported. Re-audits run
+via the `audit` skill (`.claude/skills/audit/SKILL.md`), which encodes the
+adversarial-verification method and seeds from AUDIT.md so settled verdicts
+stay settled.

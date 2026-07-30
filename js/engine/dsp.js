@@ -102,7 +102,7 @@ MDS.dsp = (function () {
         const env = Math.pow(1 - t, 2.2 + size * 1.5);
         const a = 0.05 + (1 - tone) * 0.55 + t * 0.3; // more smoothing later + darker with low tone
         const src = noise[(i * (ch + 1) + ch * 7919) % noise.length];
-        lp += Math.min(1, 1 - a) * (src - lp);
+        lp += (1 - a) * (src - lp); // a is always >= 0.05, so 1-a needs no clamp
         d[i] = lp * env;
       }
       // tiny pre-delay of silence keeps the dry transient distinct

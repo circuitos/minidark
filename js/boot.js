@@ -15,6 +15,11 @@ MDS.LAME_STATE = "loading";
   "use strict";
   var s = document.createElement("script");
   s.src = "https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js";
+  // SRI pins the exact lamejs 1.2.0 build (sha512 of the npm artifact cdnjs
+  // mirrors): a tampered or swapped CDN response now fails closed into the
+  // same WAV-only fallback as a network error, instead of executing.
+  s.integrity = "sha512-oL3Sqp+n3hHwik4T/KloWyCk4AZ74phPamKnN618oy4MyRNq5zAycIVtZTUTrKizSYdxkhpN3XQxh7ms9nMYmA==";
+  s.crossOrigin = "anonymous";
   s.async = true;
   s.onload = function () { MDS.LAME_STATE = "ok"; };
   s.onerror = function () { MDS.LAME_STATE = "failed"; };

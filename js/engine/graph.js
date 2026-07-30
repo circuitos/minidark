@@ -86,7 +86,7 @@ MDS.graph = (function () {
       const tone = ctx.createBiquadFilter(); tone.type = "lowpass"; tone.frequency.value = 6500;
       const ret = ctx.createGain(); ret.gain.value = 0.5;
       input.connect(conv); conv.connect(tone); tone.connect(ret); ret.connect(mIn);
-      g.fx.verb = { input, conv, tone, ret, _size: 0.55, _tone: 0.4 };
+      g.fx.verb = { input, conv, tone, ret, _size: 11, _tone: 8 }; // quantized ×20, matches apply()
     }
     // Bitcrusher: staircase waveshaper (see dsp.crushCurve for rationale)
     {
@@ -130,7 +130,6 @@ MDS.graph = (function () {
     const ctx = g.ctx;
     const fx = project.fx;
 
-    g.fx.dist.pre.gain.value = 1; // drive handled by curve steepness
     // Curve rebuilds are guarded like the reverb IR below: apply() runs per
     // pointermove of ANY knob (incl. tempo/volume), and regenerating a
     // 2048/8192-point Float32Array per move is pure waste when unchanged.
@@ -151,9 +150,12 @@ MDS.graph = (function () {
     setParam(g.fx.delay.tone.frequency, 500 + fx.delay.tone * 7500, ctx);
     setParam(g.fx.delay.ret.gain, fx.delay.level, ctx);
 
-    if (Math.abs(g.fx.verb._size - fx.verb.size) > 0.02 || Math.abs(g.fx.verb._tone - fx.verb.tone) > 0.05) {
+    // Quantized exactly like dsp.makeIR's cache key, so this guard and that
+    // cache agree on what counts as "changed" (they used to disagree).
+    const qs = Math.round(fx.verb.size * 20), qt = Math.round(fx.verb.tone * 20);
+    if (g.fx.verb._size !== qs || g.fx.verb._tone !== qt) {
       g.fx.verb.conv.buffer = dsp.makeIR(ctx, fx.verb.size, fx.verb.tone);
-      g.fx.verb._size = fx.verb.size; g.fx.verb._tone = fx.verb.tone;
+      g.fx.verb._size = qs; g.fx.verb._tone = qt;
     }
     setParam(g.fx.verb.tone.frequency, 1200 + fx.verb.tone * 8800, ctx);
     setParam(g.fx.verb.ret.gain, fx.verb.level, ctx);
@@ -173,22 +175,29 @@ MDS.graph = (function () {
     applyMixer(g, project);
   }
 
+  /* Per-channel memo: applyMixer is the onInput of every send knob and
+     channel fader, so without it one knob drag reschedules all 56 params
+     (8 tracks × level+mute+5 sends) per pointermove. */
   function applyMixer(g, project) {
     const ctx = g.ctx;
     const anySolo = project.tracks.some((t) => t.solo);
     project.tracks.forEach((t, i) => {
       const ch = g.tracks[i];
-      setParam(ch.chLevel.gain, t.level, ctx);
-      const audible = !t.mute && (!anySolo || t.solo);
-      setParam(ch.muteG.gain, audible ? 1 : 0, ctx);
-      for (const k of FX_KEYS) setParam(ch.sends[k].gain, t.sends[k], ctx);
+      const m = ch._last || (ch._last = { level: NaN, audible: NaN, sends: {} });
+      if (m.level !== t.level) { setParam(ch.chLevel.gain, t.level, ctx); m.level = t.level; }
+      const audible = !t.mute && (!anySolo || t.solo) ? 1 : 0;
+      if (m.audible !== audible) { setParam(ch.muteG.gain, audible, ctx); m.audible = audible; }
+      for (const k of FX_KEYS) {
+        if (m.sends[k] !== t.sends[k]) { setParam(ch.sends[k].gain, t.sends[k], ctx); m.sends[k] = t.sends[k]; }
+      }
     });
   }
 
+  /* Step divisions in beats (module-level: called per apply, allocation-free). */
+  const DIV_BEATS = { "1/16": 0.25, "1/8": 0.5, "3/16": 0.75, "1/4": 1 };
   function delaySeconds(bpm, div) {
     const beat = 60 / bpm;
-    const map = { "1/16": beat / 4, "1/8": beat / 2, "3/16": (beat / 4) * 3, "1/4": beat };
-    return Math.min(3.9, map[div] || (beat / 4) * 3);
+    return Math.min(3.9, beat * (DIV_BEATS[div] || 0.75));
   }
 
   return { build, apply, applyMixer, delaySeconds, NTRACKS, FX_KEYS };

@@ -97,12 +97,7 @@ MDS.ui.seq = (function () {
     spacer.className = "grow";
     /* Grouped into equal-height cells with hairline separators so every
        control sits on one rhythm instead of floating at its own height. */
-    const cell = (...kids) => {
-      const d = document.createElement("div");
-      d.className = "tp-cell";
-      d.append(...kids);
-      return d;
-    };
+    const cell = (...kids) => MDS.ui.cell("tp-cell", ...kids);
     root.append(
       cell(play, pos),
       cell(tempo.el, swing.el),
@@ -147,12 +142,7 @@ MDS.ui.seq = (function () {
     const clr = document.createElement("button"); clr.textContent = C().seq.clear; clr.dataset.tt = "patClear";
     clr.onclick = () => { S().project.patterns[S().sel.pattern] = S().emptyPattern(); MDS.bus.emit("pattern"); };
     /* Same cell rhythm as the transport: label, bank, edit actions. */
-    const hCell = (...kids) => {
-      const d = document.createElement("div");
-      d.className = "hd-cell";
-      d.append(...kids);
-      return d;
-    };
+    const hCell = (...kids) => MDS.ui.cell("hd-cell", ...kids);
     head.append(hCell(title), hCell(bank), hCell(cp, pst, clr));
 
     const scroll = document.createElement("div");
@@ -194,20 +184,40 @@ MDS.ui.seq = (function () {
         cell.className = "cell";
         cell.dataset.ti = String(ti); cell.dataset.si = String(si);
         if (si % 4 === 0 && si !== 0) cell.dataset.beat = "1";
-        cell.onpointerdown = (e) => { if (e.button === 0) startLenDrag(ti, si); };
-        cell.onclick = (e) => {
-          if (dragMoved) return;              // the drag already edited this note
-          if (e.shiftKey && trackIsMelodic(ti)) { growLen(ti, si); return; }
-          toggleCell(ti, si);
-        };
-        cell.oncontextmenu = (e) => { e.preventDefault(); accentCell(ti, si); };
-        cell.onwheel = (e) => { e.preventDefault(); nudgeNote(ti, si, e.deltaY < 0 ? 1 : -1); };
         row.appendChild(cell);
         rowCells.push(cell);
       }
       cells.push(rowCells);
       grid.appendChild(row);
     }
+    /* One delegated listener set per gesture instead of 4 closures on each
+       of the 128 cells; the len-drag already reads dataset the same way.
+       Row heads inside the grid have no .cell ancestor, so they fall through
+       to their own handlers untouched. */
+    const cellFrom = (e) => {
+      const el = e.target.closest && e.target.closest(".cell");
+      return el ? { ti: +el.dataset.ti, si: +el.dataset.si } : null;
+    };
+    grid.addEventListener("pointerdown", (e) => {
+      const c = cellFrom(e);
+      if (c && e.button === 0) startLenDrag(c.ti, c.si);
+    });
+    grid.addEventListener("click", (e) => {
+      const c = cellFrom(e);
+      if (!c || dragMoved) return;            // the drag already edited this note
+      if (e.shiftKey && trackIsMelodic(c.ti)) { growLen(c.ti, c.si); return; }
+      toggleCell(c.ti, c.si);
+    });
+    grid.addEventListener("contextmenu", (e) => {
+      const c = cellFrom(e);
+      if (!c) return;
+      e.preventDefault(); accentCell(c.ti, c.si);
+    });
+    grid.addEventListener("wheel", (e) => {
+      const c = cellFrom(e);
+      if (!c) return;
+      e.preventDefault(); nudgeNote(c.ti, c.si, e.deltaY < 0 ? 1 : -1);
+    }, { passive: false });
     scroll.appendChild(grid);
 
     /* Per-column step LEDs above the grid, aligned to the cell rhythm. */
@@ -377,12 +387,7 @@ MDS.ui.seq = (function () {
     const len = document.createElement("span"); len.className = "seq-help"; els.songLen = len;
     const hint = document.createElement("span");
     hint.className = "seq-help is-right"; hint.textContent = C().seq.chipHint;
-    const sCell = (...kids) => {
-      const d = document.createElement("div");
-      d.className = "hd-cell";
-      d.append(...kids);
-      return d;
-    };
+    const sCell = (...kids) => MDS.ui.cell("hd-cell", ...kids);
     head.append(sCell(title), sCell(add, clear), sCell(len), hint);
     const chain = document.createElement("div");
     chain.className = "chain"; chain.dataset.tt = "songChain";
@@ -472,11 +477,16 @@ MDS.ui.seq = (function () {
   }
 
   /* ── Playhead (rAF drains the engine's tick queue) ─────────────────── */
+  let lastPlaying = null;
   function raf() {
     requestAnimationFrame(raf);
-    els.playLabel.textContent = MDS.seq.playing ? C().transport.stop : C().transport.play;
-    els.play.classList.toggle("is-playing", MDS.seq.playing);
-    if (!MDS.seq.playing) {
+    const playing = MDS.seq.playing;
+    if (playing !== lastPlaying) {   // write the button only on transitions
+      lastPlaying = playing;
+      els.playLabel.textContent = playing ? C().transport.stop : C().transport.play;
+      els.play.classList.toggle("is-playing", playing);
+    }
+    if (!playing) {
       if (lastPlayCol >= 0) { clearPlayCol(); lastPlayCol = -1; }
       return;
     }
@@ -485,7 +495,6 @@ MDS.ui.seq = (function () {
     const ticks = MDS.seq.drainTicks(audio.ctx.currentTime);
     if (!ticks.length) return;
     const t = ticks[ticks.length - 1];
-    MDS.bus.emit("tick", t);
     // Two-digit, tabular figures: the readout must not change width as it
     // counts, or every control to its right in the transport shifts.
     const pad = (n) => String(n).padStart(2, "0");
@@ -521,7 +530,16 @@ MDS.ui.seq = (function () {
     buildSong(songRoot);
     refreshGrid(); refreshSong();
 
-    MDS.bus.on("sel", () => { refreshGrid(); els.syncLock(); });
+    /* sel fires for entry-note wheel ticks and key changes too; the grid only
+       shows sel.track (row highlight) and sel.pattern (bank), so a sel that
+       kept both skips the 128-cell repaint (the pattern event covers edits). */
+    let lastSelTrack = S().sel.track, lastSelPattern = S().sel.pattern;
+    MDS.bus.on("sel", () => {
+      els.syncLock();
+      if (S().sel.track === lastSelTrack && S().sel.pattern === lastSelPattern) return;
+      lastSelTrack = S().sel.track; lastSelPattern = S().sel.pattern;
+      refreshGrid();
+    });
     MDS.bus.on("pattern", refreshGrid);
     MDS.bus.on("mix", refreshGrid);
     MDS.bus.on("song", refreshSong);
@@ -531,6 +549,7 @@ MDS.ui.seq = (function () {
       if (els.masterVol) els.masterVol.set(S().project.master.vol, false);
     });
     MDS.bus.on("project", () => {
+      lastSelTrack = S().sel.track; lastSelPattern = S().sel.pattern;
       els.tempo.set(S().project.bpm, false);
       els.swing.set(S().project.swing, false);
       if (els.masterVol) els.masterVol.set(S().project.master.vol, false);

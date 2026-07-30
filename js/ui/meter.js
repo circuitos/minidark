@@ -39,6 +39,7 @@ MDS.ui.meter = (function () {
   let cur = null;            /* the mounted meter's refs (latest wins) */
   let rafOn = false;
   let last = 0;              /* previous frame timestamp */
+  let lastTxt = "";          /* last rendered dB readout */
   /* Shared across mounts and re-renders, so toggling survives a tab switch.
      Deliberately in memory only: this app stores nothing between visits. */
   let on = true;
@@ -53,7 +54,8 @@ MDS.ui.meter = (function () {
 
   function ensureTap() {
     const audio = MDS.state.audio;
-    if (!audio || tap) return;
+    if (!audio) return;
+    if (tap && tap.ctx === audio.ctx) return; // keyed on ctx: survives a rebuild
     const ctx = audio.ctx, g = audio.graph;
     const splitter = ctx.createChannelSplitter(2);
     const mk = () => {
@@ -66,7 +68,7 @@ MDS.ui.meter = (function () {
     splitter.connect(anL, 0);
     splitter.connect(anR, 1);
     tap = {
-      splitter, anL, anR,
+      ctx, splitter, anL, anR,
       bufL: new Float32Array(anL.fftSize), bufR: new Float32Array(anR.fftSize),
     };
   }
@@ -173,6 +175,7 @@ MDS.ui.meter = (function () {
       });
       cur.num.textContent = "-inf " + C().fx.meterDb;
       cur.num.classList.remove("is-clip");
+      lastTxt = "";
     }
   }
 
@@ -213,13 +216,16 @@ MDS.ui.meter = (function () {
     }
     drawCol(cur.L, toScale(dbL), now, dt);
     drawCol(cur.R, toScale(dbR), now, dt);
-    const grV = Math.max(0, Math.min(1, gr / GR_RANGE));
-    cur.GR.lvl = Math.max(grV, cur.GR.lvl - FALL * dt);
-    cur.GR.fill.style.transform = "scaleY(" + cur.GR.lvl.toFixed(4) + ")";
+    // GR is a plain drawCol too: its peak is null, so the peak branch no-ops.
+    drawCol(cur.GR, Math.max(0, Math.min(1, gr / GR_RANGE)), now, dt);
 
     const db = Math.max(dbL, dbR);
-    cur.num.textContent = (db <= DB_FLOOR ? "-inf" : (db > 0 ? "+" : "") + db.toFixed(1)) + " " + C().fx.meterDb;
-    cur.num.classList.toggle("is-clip", db > -0.5);
+    const txt = (db <= DB_FLOOR ? "-inf" : (db > 0 ? "+" : "") + db.toFixed(1)) + " " + C().fx.meterDb;
+    if (txt !== lastTxt) {   // skip the DOM write on the many identical frames
+      lastTxt = txt;
+      cur.num.textContent = txt;
+      cur.num.classList.toggle("is-clip", db > -0.5);
+    }
   }
 
   return { create, setOn, isOn: () => on };

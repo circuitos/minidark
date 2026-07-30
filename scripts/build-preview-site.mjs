@@ -46,10 +46,18 @@ function detectRootBranch() {
 }
 
 /* Branch name → directory slug. Slashes become "--"; anything else unsafe
-   becomes "-". Keep this in sync with the sticky-comment job in
-   .github/workflows/deploy-pages.yml. */
+   becomes "-". THE one implementation: the sticky-comment job in
+   .github/workflows/deploy-pages.yml calls `--slug` below instead of
+   carrying a copy (the two had a keep-in-sync contract before). */
 function slugify(branch) {
   return branch.replace(/\//g, "--").replace(/[^A-Za-z0-9._-]/g, "-");
+}
+
+/* `node scripts/build-preview-site.mjs --slug <branch>`: print the slug and
+   exit. Lets CI derive preview URLs without duplicating the rule. */
+if (process.argv[2] === "--slug") {
+  console.log(slugify(process.argv[3] || ""));
+  process.exit(0);
 }
 
 function listBranches() {

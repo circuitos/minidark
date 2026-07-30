@@ -239,7 +239,11 @@ MDS.demos = (function () {
   }
 
   const makers = { d1, d2, d3 };
-  function make(id) { return makers[id](); }
+  function make(id) {
+    const mk = makers[id];
+    if (!mk) throw new Error("unknown-demo:" + id); // diagnosable, not a bare TypeError
+    return mk();
+  }
   function ids() { return ["d1", "d2", "d3"]; }
 
   return { make, ids };

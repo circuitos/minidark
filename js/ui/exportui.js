@@ -34,8 +34,16 @@ MDS.ui.exportDialog = (function () {
     return { wrap, r };
   }
 
+  let isOpen = false;   // one dialog at a time: stacked modals stack Esc handlers
+  let mp3Timer = null;  // re-checks a still-loading lamejs (see below)
+
   function open() {
-    const m = MDS.ui.modal.open({ title: C().title });
+    if (isOpen) return;
+    isOpen = true;
+    const m = MDS.ui.modal.open({
+      title: C().title,
+      onClose: () => { isOpen = false; clearInterval(mp3Timer); mp3Timer = null; },
+    });
 
     /* project name */
     const nameWrap = document.createElement("label");
@@ -69,6 +77,16 @@ MDS.ui.exportDialog = (function () {
       const n = document.createElement("div"); n.className = "exp-note";
       n.textContent = C().mp3Unavailable;
       notes.appendChild(n);
+      // lamejs may still be in flight from the CDN: re-enable if it lands
+      // while this dialog is open, instead of demanding a reopen.
+      if (MDS.LAME_STATE === "loading") {
+        mp3Timer = setInterval(() => {
+          if (!MDS.exporter.mp3Available()) return;
+          fMp3.r.disabled = false;
+          n.remove();
+          clearInterval(mp3Timer); mp3Timer = null;
+        }, 500);
+      }
     }
     if (!MDS.exporter.webmMime()) {
       fWebm.r.disabled = true;
@@ -97,6 +115,7 @@ MDS.ui.exportDialog = (function () {
       log.textContent = C().rendering;
       try {
         const buffer = await MDS.exporter.render(S().project, { scope, patternIdx: S().sel.pattern });
+        if (!document.contains(log)) return;   // dialog closed mid-render
         let blob, ext = fmt;
         if (fmt === "mp3" && MDS.exporter.mp3Available()) blob = MDS.exporter.encodeMp3(buffer, 192);
         else if (fmt === "webm") { blob = await MDS.exporter.recordCompressed(buffer); ext = blob.type.includes("ogg") ? "ogg" : "webm"; }

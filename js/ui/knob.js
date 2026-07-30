@@ -11,6 +11,16 @@ MDS.ui = MDS.ui || {};
    is automatically the change for both widgets (they used to carry
    byte-identical copies, which had already earned one two-file bugfix).
    c: { get, set, toNorm, fromNorm, min, max, initial } */
+/* Shared header/tool cell: seq, song and keyboard headers used to carry four
+   copies of this wrapper (knob.js hosts the tiny cross-widget helpers because
+   it is the first UI file in the load order). */
+MDS.ui.cell = function (cls, ...kids) {
+  const d = document.createElement("div");
+  d.className = cls;
+  d.append(...kids);
+  return d;
+};
+
 MDS.ui.ctlKeys = function (el, c) {
   el.addEventListener("dblclick", () => c.set(c.initial));
   el.addEventListener("wheel", (e) => {
@@ -25,6 +35,10 @@ MDS.ui.ctlKeys = function (el, c) {
     else if (e.key === "End") { c.set(c.max); e.preventDefault(); }
   });
 };
+
+/* --knob-stroke-w is a constant token (single dark theme by design): read it
+   once, not once per knob (one MIXER render builds 40 of them). */
+let knobStrokeW = 0;
 
 MDS.ui.knob = function (opts) {
   "use strict";
@@ -56,8 +70,11 @@ MDS.ui.knob = function (opts) {
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("viewBox", "0 0 40 40");
-  const css = getComputedStyle(document.documentElement);
-  const sw = parseFloat(css.getPropertyValue("--knob-stroke-w")) || 4;
+  if (!knobStrokeW) {
+    knobStrokeW = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue("--knob-stroke-w")) || 4;
+  }
+  const sw = knobStrokeW;
   const R = 16;
   const a0 = 135, sweep = 270;
   const polar = (deg) => {

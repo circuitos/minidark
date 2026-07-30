@@ -208,7 +208,9 @@ MDS.lib = (function () {
     if (!e) return Promise.reject(new Error("unknown-sound:" + id));
     switch (e.source.type) {
       case "synth":
-        return Promise.resolve(e.source.patch);
+        // Deep copy, same invariant as materialize(): callers must never be
+        // handed the live registry patch to mutate.
+        return Promise.resolve(JSON.parse(JSON.stringify(e.source.patch)));
       case "base64":
         if (bufferCache[id]) return Promise.resolve(bufferCache[id]);
         return ctx.decodeAudioData(base64ToArrayBuffer(e.source.data))
