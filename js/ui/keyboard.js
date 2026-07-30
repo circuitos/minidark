@@ -22,6 +22,11 @@ MDS.ui.keyboard = (function () {
   const BLACK = { 1: true, 3: true, 6: true, 8: true, 10: true };
 
   const held = {};       // note → voice handle (pointer + qwerty share it)
+  // QWERTY offset → the note it actually started. keyup must release THAT
+  // note: recomputing playedNote(off) at release time misses whenever the
+  // octave, key or scale lock changed while the key was down, leaving the
+  // voice ringing forever (its oscillators only stop inside release()).
+  const heldOffsets = {};
   let keyEls = {};       // note → DOM key
   let root = null, nameEl = null;
 
@@ -51,7 +56,10 @@ MDS.ui.keyboard = (function () {
     if (keyEls[n]) keyEls[n].classList.remove("is-down");
   }
 
-  function allOff() { for (const n of Object.keys(held)) noteOff(+n); }
+  function allOff() {
+    for (const n of Object.keys(held)) noteOff(+n);
+    for (const off of Object.keys(heldOffsets)) delete heldOffsets[off];
+  }
 
   function build(container) {
     root = container;
@@ -93,13 +101,18 @@ MDS.ui.keyboard = (function () {
       // shortcuts own the modified keys: Ctrl+Z is undo, not the Z note
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const off = QWERTY[e.key.toLowerCase()];
-      if (off != null) { noteOn(playedNote(off)); }
+      if (off != null) {
+        const n = playedNote(off);
+        heldOffsets[off] = n;
+        noteOn(n);
+      }
     });
     document.addEventListener("keyup", (e) => {
       const off = QWERTY[e.key.toLowerCase()];
-      if (off != null) {
-        // release ALL held notes matching this offset's snapped pitch
-        noteOff(playedNote(off));
+      if (off != null && heldOffsets[off] != null) {
+        // release the note this key actually started (see heldOffsets above)
+        noteOff(heldOffsets[off]);
+        delete heldOffsets[off];
       }
     });
     window.addEventListener("blur", allOff);

@@ -75,12 +75,10 @@
   --c-accent2-soft: #234b63; /* secondary, dimmed                 */
   --c-ok: #4cb96a;           /* success / power LED               */
   --c-warn: #e6b345;         /* warnings / notices (amber)        */
-  --c-black: #000000;        /* shadow base only                  */
   --c-white: #ffffff;        /* highlight base only               */
   --c-scrim: rgba(4, 5, 7, 0.78);  /* modal backdrop              */
 
   /* Hairlines + textures (kept: subtle by definition) */
-  --c-glass1: #16171b;                   /* panel fill (flat now) */
   --c-glass2: #1a1c21;                   /* group fill            */
   --c-hair: rgba(255, 255, 255, 0.055);  /* hairline border       */
   --c-hair-strong: rgba(255, 255, 255, 0.12); /* lit hairline     */

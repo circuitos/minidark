@@ -393,6 +393,10 @@ MDS.ui.panels = (function () {
   }
 
   function renderLib() {
+    // The panel body is the scroll container and this tab rebuilds itself on
+    // every interaction; without this, clicking ⓘ or USE ON TRACK below the
+    // fold snaps the panel back to the top.
+    const scrollTop = bodyEl.scrollTop;
     bodyEl.innerHTML = "";
 
     /* demo tracks (compact cards: header row + blurb) */
@@ -483,6 +487,7 @@ MDS.ui.panels = (function () {
       if (infoOpen === e.id && C().libInfo[e.id]) list.appendChild(infoPanel(e));
     }
     bodyEl.append(lh, hint, cats, list);
+    bodyEl.scrollTop = scrollTop;
   }
 
   /* Import: base64 for the project file, one decode for duration + cache.

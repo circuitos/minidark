@@ -194,7 +194,10 @@ MDS.state = (function () {
     const entry = MDS.lib.get(soundId);
     if (entry && entry.baseNote != null) tr.baseNote = entry.baseNote;
     if (tr.patch && tr.patch.engine === "buffer" && state.audio) {
-      MDS.lib.resolve(state.audio.ctx, soundId).then((buf) => { tr.patch.buffer = buf; });
+      // Capture the patch object: re-reading tr.patch at resolve time would
+      // let a slow decode overwrite whatever sound was assigned meanwhile.
+      const p = tr.patch;
+      MDS.lib.resolve(state.audio.ctx, soundId).then((buf) => { p.buffer = buf; });
     }
     MDS.bus.emit("patch");
   };
@@ -297,6 +300,15 @@ MDS.state = (function () {
   state.loadProject = function (p, opts) {
     const base = defaultProject();
     const proj = Object.assign(base, p);
+    // fx/master need the same defensive treatment as tracks below: the top
+    // level Object.assign replaces them wholesale, so a partial object from
+    // an old or hand-edited file would crash graph.apply later.
+    const fresh = defaultProject();
+    proj.fx = {};
+    for (const k of Object.keys(fresh.fx)) {
+      proj.fx[k] = Object.assign(fresh.fx[k], (p.fx || {})[k] || {});
+    }
+    proj.master = Object.assign(fresh.master, p.master || {});
     proj.tracks = base.tracks.map((bt, i) => {
       const src = (p.tracks && p.tracks[i]) || {};
       const t = Object.assign(bt, src);

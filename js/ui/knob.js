@@ -95,6 +95,7 @@ MDS.ui.knob = function (opts) {
   /* drag */
   let dragY = null, dragN = 0;
   el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return; // right-click must not start a drag (see seq.js cells)
     dragY = e.clientY; dragN = toNorm(value);
     el.classList.add("is-active");
     el.setPointerCapture(e.pointerId);

@@ -46,7 +46,7 @@ MDS.graph = (function () {
       const tone = ctx.createBiquadFilter(); tone.type = "lowpass"; tone.frequency.value = 4000;
       const ret = ctx.createGain(); ret.gain.value = 0.5;
       input.connect(pre); pre.connect(shaper); shaper.connect(tone); tone.connect(ret); ret.connect(mIn);
-      g.fx.dist = { input, pre, shaper, tone, ret };
+      g.fx.dist = { input, pre, shaper, tone, ret, _drive: 0.5 };
     }
     // Chorus: two modulated delays, LFOs in opposite phase for stereo width
     {
@@ -94,7 +94,7 @@ MDS.graph = (function () {
       const shaper = ctx.createWaveShaper(); shaper.curve = dsp.crushCurve(8);
       const ret = ctx.createGain(); ret.gain.value = 0.4;
       input.connect(shaper); shaper.connect(ret); ret.connect(mIn);
-      g.fx.crush = { input, shaper, ret };
+      g.fx.crush = { input, shaper, ret, _bits: 8 };
     }
 
     /* ── Track channels ── */
@@ -131,7 +131,13 @@ MDS.graph = (function () {
     const fx = project.fx;
 
     g.fx.dist.pre.gain.value = 1; // drive handled by curve steepness
-    g.fx.dist.shaper.curve = dsp.distCurve(fx.dist.drive);
+    // Curve rebuilds are guarded like the reverb IR below: apply() runs per
+    // pointermove of ANY knob (incl. tempo/volume), and regenerating a
+    // 2048/8192-point Float32Array per move is pure waste when unchanged.
+    if (g.fx.dist._drive !== fx.dist.drive) {
+      g.fx.dist.shaper.curve = dsp.distCurve(fx.dist.drive);
+      g.fx.dist._drive = fx.dist.drive;
+    }
     setParam(g.fx.dist.tone.frequency, 600 + fx.dist.tone * 7400, ctx);
     setParam(g.fx.dist.ret.gain, fx.dist.level, ctx);
 
@@ -152,7 +158,10 @@ MDS.graph = (function () {
     setParam(g.fx.verb.tone.frequency, 1200 + fx.verb.tone * 8800, ctx);
     setParam(g.fx.verb.ret.gain, fx.verb.level, ctx);
 
-    g.fx.crush.shaper.curve = dsp.crushCurve(fx.crush.bits);
+    if (g.fx.crush._bits !== fx.crush.bits) {
+      g.fx.crush.shaper.curve = dsp.crushCurve(fx.crush.bits);
+      g.fx.crush._bits = fx.crush.bits;
+    }
     setParam(g.fx.crush.ret.gain, fx.crush.level, ctx);
 
     // Master: "glue" macro maps one knob onto threshold+ratio

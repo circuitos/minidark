@@ -69,6 +69,7 @@ MDS.ui.fader = function (opts) {
     return horiz ? (e.clientX - r.left) / r.width : 1 - (e.clientY - r.top) / r.height;
   };
   el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return; // right-click must not jump the value (see seq.js cells)
     dragging = true;
     el.classList.add("is-active");
     el.setPointerCapture(e.pointerId);

@@ -35,7 +35,9 @@ const owners = {};
 for (const f of walk("js", [".js"])) {
   const src = readFileSync(f, "utf8");
   for (const line of src.split("\n")) {
-    const m = line.match(/^(?:window\.)?MDS\.([A-Za-z_$][\w]*(?:\.[A-Za-z_$][\w]*)?)\s*=/);
+    // Leading whitespace and 3+ path segments count too: indented definitions
+    // (MDS.selftest in main.js) used to slip past this guard entirely.
+    const m = line.match(/^\s*(?:window\.)?MDS\.([A-Za-z_$][\w]*(?:\.[A-Za-z_$][\w]*)*)\s*=(?!=)/);
     if (!m || line.includes("|| {}")) continue;
     const path = m[1];
     if (owners[path] && owners[path] !== f) fail(`duplicate global MDS.${path} defined in ${owners[path]} and ${f}`);

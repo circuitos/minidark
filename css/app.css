@@ -480,8 +480,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: calc(var(--bw
   width: 4.9rem;
 }
 /* Uniform name band so long track names never shift a strip's controls. */
-.strip .s-name { width: 100%; min-height: 1.6rem; }
-.strip .s-name { font-size: var(--fs-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-ink1); }
+.strip .s-name {
+  width: 100%; min-height: 1.6rem;
+  font-size: var(--fs-xs); font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--c-ink1);
+}
 .strip .ms { display: flex; gap: var(--sp-1); }
 .strip .ms button { font-size: var(--fs-xs); padding: 0 var(--sp-2); min-height: 1.6rem; }
 .strip .sends { display: flex; flex-direction: column; gap: var(--sp-1); }

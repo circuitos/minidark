@@ -285,8 +285,14 @@ MDS.synth = (function () {
     const q = (v) => Math.round((v || 0) * 50) / 50;
     const key = note + "|" + q(patch.decay) + "|" + q(patch.bright) + "|" + q(patch.pick);
     let buf = byKey.get(key);
-    if (!buf) {
-      if (byKey.size > 48) byKey.clear(); // knob sweeps must not hoard memory
+    if (buf) {
+      // LRU refresh: re-insert so a knob sweep evicts stale sweeps, never the
+      // notes the running pattern is actively playing. Evicting those forces
+      // a ~110k-sample karplus re-render inside the scheduler's lookahead
+      // window, which is a dropout mechanism, not a memory policy.
+      byKey.delete(key); byKey.set(key, buf);
+    } else {
+      if (byKey.size > 48) byKey.delete(byKey.keys().next().value); // oldest out
       const data = dsp.karplus(ctx.sampleRate, dsp.midiToFreq(note), patch);
       buf = ctx.createBuffer(1, data.length, ctx.sampleRate);
       buf.copyToChannel(data, 0);
