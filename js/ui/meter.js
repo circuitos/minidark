@@ -45,6 +45,12 @@ MDS.ui.meter = (function () {
   const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
   if (reduced && reduced.matches) on = false;
 
+  /* The compact bars flex with the topbar, so a cached height goes stale on
+     resize and the peak tick would ride a wrong scale. Cheap to invalidate. */
+  window.addEventListener("resize", () => {
+    if (cur) { cur.L.h = 0; cur.R.h = 0; cur.GR.h = 0; }
+  });
+
   function ensureTap() {
     const audio = MDS.state.audio;
     if (!audio || tap) return;
@@ -185,6 +191,11 @@ MDS.ui.meter = (function () {
     if (!cur || !document.contains(cur.root)) { cur = null; rafOn = false; return; }
     if (!on) { rafOn = false; return; }   // switched off: stop burning frames
     requestAnimationFrame(loop);
+
+    // Pre-power there is nothing to meter and .app is display:none, so
+    // drawCol would force a layout read per frame against zero-height bars
+    // (exactly what the header note promises this loop never does).
+    if (!MDS.state.audio) { last = ts || performance.now(); return; }
 
     const now = ts || performance.now();
     let dt = (now - last) / 1000;

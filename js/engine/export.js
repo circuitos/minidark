@@ -12,6 +12,25 @@ MDS.exporter = (function () {
   const SR = 44100;
   const TAIL = 2.5; // seconds of reverb/delay tail after the last bar
 
+  /* A fixed tail truncates slow sounds: a pad with r=1.4 rings ~5.6 s past
+     its note end (adsr stops at r*4). Look at what actually plays in the
+     chain's FINAL bar and extend the tail by the longest release there. */
+  function tailSecs(project, lastPatternIdx) {
+    const pat = project.patterns[lastPatternIdx];
+    let extra = 0;
+    if (pat) {
+      project.tracks.forEach((tr, ti) => {
+        const p = tr.patch;
+        if (!p || !pat.steps[ti] || !pat.steps[ti].some((c) => c && c.on)) return;
+        const rel = p.engine === "sub" || p.engine === "fm" ? (p.r || 0.05) * 4
+          : p.engine === "pluck" ? 0.4 + (p.decay || 0) * 0.35
+          : 0.3;
+        if (rel > extra) extra = rel;
+      });
+    }
+    return TAIL + extra;
+  }
+
   /* Render the project. scope: 'song' (whole chain) | 'pattern' (current
      pattern looped 4×, handy while sketching). Resolves to an AudioBuffer. */
   function render(project, opts) {
@@ -24,7 +43,7 @@ MDS.exporter = (function () {
 
     const sDur = 60 / project.bpm / 4;
     const totalSteps = chain.length * 16;
-    const durSecs = totalSteps * sDur + TAIL;
+    const durSecs = totalSteps * sDur + tailSecs(project, chain[chain.length - 1]);
     const ctx = new OfflineAudioContext(2, Math.ceil(SR * durSecs), SR);
     const g = MDS.graph.build(ctx);
     MDS.graph.apply(g, project);
@@ -139,5 +158,5 @@ MDS.exporter = (function () {
     return `${slug}-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.${ext}`;
   }
 
-  return { render, encodeWav, encodeMp3, mp3Available, webmMime, recordCompressed, filename, TAIL };
+  return { render, encodeWav, encodeMp3, mp3Available, webmMime, recordCompressed, filename, TAIL, tailSecs };
 })();

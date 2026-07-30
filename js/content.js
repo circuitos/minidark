@@ -143,6 +143,7 @@ MDS.CONTENT = {
     sampleSecs: (s) => (Math.round(s * 100) / 100) + "s",
     sampleAdded: (name) => `"${name}" imported. Click it to preview; USE ON TRACK puts it on the selected track.`,
     sampleTooBig: (name) => `"${name}" is over 8 MB. Samples are stored inside your project file, so keep them short.`,
+    samplesFull: (name) => `"${name}" would push your imported samples past 24 MB in total. They all travel inside the project file: remove one you are not using first.`,
     sampleBad: (name) => `Could not read "${name}" as audio. WAV, MP3 and OGG all work.`,
     remove: "✕",
   },
@@ -289,6 +290,7 @@ MDS.CONTENT = {
     mp3Unavailable: "MP3 encoder (lamejs from cdnjs) failed to load, so exports fall back to WAV. Check your network and reload to retry.",
     webmUnavailable: "This browser can't record OGG/WebM; use WAV or MP3.",
     emptySong: "The song chain is empty. Add patterns in SONG mode, or export the current pattern instead.",
+    tooLong: (bars) => `The song chain is ${bars} bars. Rendering caps at 300 bars (roughly ten minutes) so the encoder cannot freeze the page: export it in sections and join them in any audio editor.`,
     err: (msg) => `Export failed: ${msg}`,
   },
 

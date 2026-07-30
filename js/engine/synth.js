@@ -103,6 +103,7 @@ MDS.synth = (function () {
 
     o1.start(t0); o2.start(t0);
     return {
+      amp,
       release(tOff) {
         const stopT = release(tOff);
         o1.stop(stopT); o2.stop(stopT);
@@ -130,6 +131,7 @@ MDS.synth = (function () {
     car.connect(amp); amp.connect(dest);
     car.start(t0); mod.start(t0);
     return {
+      amp,
       release(tOff) {
         const stopT = release(tOff);
         car.stop(stopT); mod.stop(stopT);
@@ -270,7 +272,7 @@ MDS.synth = (function () {
 
     for (const s of sources) s.stop(stopT);
     if (sources[0]) sources[0].onended = () => { amp.disconnect(); };
-    return { release() { /* drums are one-shots */ } };
+    return { amp, release() { /* drums are one-shots */ } };
   }
 
   /* ── Karplus-Strong plucked string (guitars) ──────────────────────────
@@ -327,6 +329,7 @@ MDS.synth = (function () {
     s.start(t0);
     s.onended = () => amp.disconnect();
     return {
+      amp,
       release(tOff) {
         // A let-go string is damped, not cut: short fade, longer on open sounds.
         const tc = 0.05 + (patch.decay || 0) * 0.07;
@@ -350,6 +353,7 @@ MDS.synth = (function () {
     s.start(t0);
     s.onended = () => amp.disconnect();
     return {
+      amp,
       release(tOff) {
         amp.gain.setTargetAtTime(0, tOff, 0.02);
         s.stop(tOff + 0.15);
@@ -368,12 +372,41 @@ MDS.synth = (function () {
     }
   }
 
-  /* Scheduled trigger used by the sequencer (live AND offline export). */
+  /* Scheduled trigger used by the sequencer (live AND offline export).
+     Every triggered voice is registered on its graph so STOP can silence
+     already-booked notes (see killAll); live keyboard notes and previews go
+     through noteOn/preview and deliberately stay unregistered. */
   function trigger(g, trackIdx, patch, opts) {
     const dest = opts.dest || g.tracks[trackIdx].input;
     const v = spawn(g.ctx, dest, patch, opts.note == null ? 60 : opts.note,
       opts.vel == null ? 0.8 : opts.vel, opts.time, opts.glideFrom);
     v.release(opts.time + (opts.dur || 0.2));
+    if (v.amp) {
+      const live = g._live || (g._live = []);
+      const now = g.ctx.currentTime;
+      for (let i = live.length - 1; i >= 0; i--) if (live[i].until < now) live.splice(i, 1);
+      // `until` is a generous voice-lifetime bound (max release r=3 → r*4)
+      live.push({ amp: v.amp, until: opts.time + (opts.dur || 0.2) + 13 });
+    }
+  }
+
+  /* Fast-fade every registered (sequencer-scheduled) voice on this graph.
+     cancel-then-pin, for the same reason adsr() pins before cancelling:
+     without the cancel, a booked note's future attack ramp would still fire
+     and the note would play out after STOP. */
+  function killAll(g, t) {
+    const live = g._live;
+    if (!live) return;
+    for (const v of live) {
+      try {
+        const p = v.amp.gain;
+        const held = p.value;
+        p.cancelScheduledValues(t);
+        p.setValueAtTime(held, t);
+        p.setTargetAtTime(0, t, 0.02);
+      } catch (e) { /* a torn-down node has nothing left to silence */ }
+    }
+    live.length = 0;
   }
 
   /* Live keyboard note. Caller must call .release() on key-up. */
@@ -406,5 +439,5 @@ MDS.synth = (function () {
     return { release() { if (done) return; done = true; v.release(g.ctx.currentTime + 0.001); } };
   }
 
-  return { trigger, noteOn, preview, auditionOn };
+  return { trigger, killAll, noteOn, preview, auditionOn };
 })();

@@ -27,6 +27,24 @@ MDS.ui.panels = (function () {
     return { g, row };
   }
 
+  /* One owner for the FX-send knob row: the INSTRUMENT group and each MIXER
+     strip used to carry verbatim copies of this loop. The "send" + suffix
+     tooltip keys are a documented coupling with validate.mjs. */
+  const SEND_SUFFIX = { dist: "Dist", chorus: "Chor", delay: "Delay", verb: "Verb", crush: "Crush" };
+  function sendKnobRow(container, tr) {
+    const knobs = {};
+    for (const [k, label] of Object.entries(C().sends)) {
+      const kn = MDS.ui.knob({
+        label, tip: "send" + SEND_SUFFIX[k],
+        min: 0, max: 1, value: tr.sends[k], fmt: fmtPct, small: true,
+        onInput: (v) => { tr.sends[k] = v; S().applyMixer(); },
+      });
+      container.appendChild(kn.el);
+      knobs[k] = kn;
+    }
+    return knobs;
+  }
+
   function patchKnob(row, tr, param, spec) {
     const k = MDS.ui.knob({
       label: spec.label, tip: spec.tip, min: spec.min, max: spec.max,
@@ -226,14 +244,7 @@ MDS.ui.panels = (function () {
     bodyEl.appendChild(voice.g);
 
     const sends = group(C().inst.gSends, "sends");
-    for (const [k, label] of Object.entries(C().sends)) {
-      const kn = MDS.ui.knob({
-        label, tip: "send" + { dist: "Dist", chorus: "Chor", delay: "Delay", verb: "Verb", crush: "Crush" }[k],
-        min: 0, max: 1, value: tr.sends[k], fmt: fmtPct, small: true,
-        onInput: (v) => { tr.sends[k] = v; S().applyMixer(); },
-      });
-      sends.row.appendChild(kn.el);
-    }
+    sendKnobRow(sends.row, tr);
     bodyEl.appendChild(sends.g);
   }
 
@@ -262,16 +273,7 @@ MDS.ui.panels = (function () {
       s.onclick = () => { tr.solo = !tr.solo; S().applyMixer(); MDS.bus.emit("mix"); };
       ms.append(m, s);
       const sends = document.createElement("div"); sends.className = "sends";
-      const sendKnobs = {};
-      for (const [k, label] of Object.entries(C().sends)) {
-        const kn = MDS.ui.knob({
-          label, tip: "send" + { dist: "Dist", chorus: "Chor", delay: "Delay", verb: "Verb", crush: "Crush" }[k],
-          min: 0, max: 1, value: tr.sends[k], fmt: fmtPct, small: true,
-          onInput: (v) => { tr.sends[k] = v; S().applyMixer(); },
-        });
-        sends.appendChild(kn.el);
-        sendKnobs[k] = kn;
-      }
+      const sendKnobs = sendKnobRow(sends, tr);
       strip.append(nm, lvl.el, ms, sends);
       mixer.appendChild(strip);
       mixerRefs.push({ tr, m, s, lvl, sendKnobs });
@@ -491,12 +493,18 @@ MDS.ui.panels = (function () {
   }
 
   /* Import: base64 for the project file, one decode for duration + cache.
-     The base64 copy is made FIRST: decodeAudioData detaches its buffer. */
+     The base64 copy is made FIRST: decodeAudioData detaches its buffer.
+     Two caps: per file, and in total (samples are held as base64 AND as a
+     decoded AudioBuffer, and SAVE stringifies all of them at once). */
   const MAX_SAMPLE_BYTES = 8 * 1024 * 1024;
+  const MAX_TOTAL_BYTES = 24 * 1024 * 1024;
   function importFiles(files) {
     const audio = S().ensureAudio();
+    let total = S().samples.reduce((n, s) => n + s.data.length * 0.75, 0);
     for (const f of files) {
       if (f.size > MAX_SAMPLE_BYTES) { MDS.ui.toast(C().lib.sampleTooBig(f.name)); continue; }
+      if (total + f.size > MAX_TOTAL_BYTES) { MDS.ui.toast(C().lib.samplesFull(f.name)); continue; }
+      total += f.size;
       f.arrayBuffer().then((ab) => {
         const bytes = new Uint8Array(ab);
         let bin = "";
@@ -556,7 +564,15 @@ MDS.ui.panels = (function () {
     root.append(tabs, bodyEl);
     showTab("inst");
 
-    MDS.bus.on("sel", () => { if (curTab === "inst" || curTab === "lib") renderers[curTab](); });
+    /* sel also fires for key changes, scale-lock toggles and per-tick wheel
+       note nudges; these tabs only depend on WHICH track is selected, so a
+       sel that kept the same track must not tear the whole tab down. */
+    let lastSelTrack = S().sel.track;
+    MDS.bus.on("sel", () => {
+      if (S().sel.track === lastSelTrack) return;
+      lastSelTrack = S().sel.track;
+      if (curTab === "inst" || curTab === "lib") renderers[curTab]();
+    });
     MDS.bus.on("patch", () => { if (curTab === "inst") renderInst(); });
     MDS.bus.on("mix", () => { if (curTab === "mixer") refreshMixer(); });
     // keep the FX/MASTER volume in step with the transport fader
@@ -565,7 +581,7 @@ MDS.ui.panels = (function () {
         masterFader.set(S().project.master.vol, false);
       }
     });
-    MDS.bus.on("project", () => renderers[curTab]());
+    MDS.bus.on("project", () => { lastSelTrack = S().sel.track; renderers[curTab](); });
   }
 
   return { init, showTab, highlightGroup };

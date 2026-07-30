@@ -114,6 +114,16 @@ Run all three check scripts before declaring any change done.
   stops the `project` event it fires from pushing the undone state back on.
 - `keyboard.js` ignores keydowns carrying Ctrl/Cmd/Alt: `z`, `x` and `c` are
   note keys, so without that guard Ctrl+Z would play a note while undoing.
+- STOP kills scheduled voices: `synth.trigger` registers every voice's amp on
+  its graph and `seq.stop()` calls `synth.killAll`, which cancel-then-pins
+  each amp (same rationale as the `adsr()` gotcha above) so booked-but-unplayed
+  notes cannot fire after STOP. Keyboard notes and previews are deliberately
+  unregistered; a new way to schedule notes should go through `trigger` or
+  register itself.
+- The INSTRUMENT and LIBRARY tabs skip re-rendering on `sel` events that keep
+  the same selected track (wheel note nudges emit `sel` per tick). If those
+  tabs ever grow UI that depends on other `sel` state (key, octave, entry
+  notes), that skip in `panels.js` init has to learn about it.
 - `sendDist`/`sendChor`/`sendDelay`/`sendVerb`/`sendCrush` tooltip keys are
   built by string concatenation in `js/ui/panels.js`; `validate.mjs` hardcodes
   that list. Change one, change both.

@@ -157,6 +157,17 @@ for (const id of MDS.demos.ids()) {
   ok("samples: register, materialize, save/load round trip, ids never collide");
 }
 
+/* ── export tail follows the last bar's slowest release ────────────────── */
+{
+  const p = MDS.state.defaultProject();
+  assert(Math.abs(MDS.exporter.tailSecs(p, 0) - MDS.exporter.TAIL) < 1e-9,
+    "empty last bar should keep the base tail");
+  p.patterns[0].steps[6][0] = { on: true, acc: false, note: 57, len: 16 }; // pad row: padWarm r=0.9
+  const t = MDS.exporter.tailSecs(p, 0);
+  assert(Math.abs(t - (MDS.exporter.TAIL + 0.9 * 4)) < 1e-9, `pad in last bar gave tail ${t}s`);
+  ok("export: tail extends for what still rings in the final bar");
+}
+
 /* ── WAV encoder against a fake AudioBuffer ────────────────────────────── */
 const N = 44100;
 const chan = new Float32Array(N);

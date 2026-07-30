@@ -6,6 +6,26 @@
 window.MDS = window.MDS || {};
 MDS.ui = MDS.ui || {};
 
+/* Shared wheel / arrow-key / double-click contract for the two continuous
+   controls (knob and fader). ONE owner: a step-size or behavior change here
+   is automatically the change for both widgets (they used to carry
+   byte-identical copies, which had already earned one two-file bugfix).
+   c: { get, set, toNorm, fromNorm, min, max, initial } */
+MDS.ui.ctlKeys = function (el, c) {
+  el.addEventListener("dblclick", () => c.set(c.initial));
+  el.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    c.set(c.fromNorm(c.toNorm(c.get()) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.03)));
+  }, { passive: false });
+  el.addEventListener("keydown", (e) => {
+    const step = e.shiftKey ? 0.01 : 0.04;
+    if (e.key === "ArrowUp" || e.key === "ArrowRight") { c.set(c.fromNorm(c.toNorm(c.get()) + step)); e.preventDefault(); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowLeft") { c.set(c.fromNorm(c.toNorm(c.get()) - step)); e.preventDefault(); }
+    else if (e.key === "Home") { c.set(c.min); e.preventDefault(); }
+    else if (e.key === "End") { c.set(c.max); e.preventDefault(); }
+  });
+};
+
 MDS.ui.knob = function (opts) {
   "use strict";
   const min = opts.min, max = opts.max;
@@ -108,18 +128,7 @@ MDS.ui.knob = function (opts) {
   });
   el.addEventListener("pointerup", () => { dragY = null; el.classList.remove("is-active"); });
   el.addEventListener("pointercancel", () => { dragY = null; el.classList.remove("is-active"); });
-  el.addEventListener("dblclick", () => set(initial));
-  el.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    set(fromNorm(toNorm(value) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.03)));
-  }, { passive: false });
-  el.addEventListener("keydown", (e) => {
-    const fine = e.shiftKey ? 0.01 : 0.04;
-    if (e.key === "ArrowUp" || e.key === "ArrowRight") { set(fromNorm(toNorm(value) + fine)); e.preventDefault(); }
-    else if (e.key === "ArrowDown" || e.key === "ArrowLeft") { set(fromNorm(toNorm(value) - fine)); e.preventDefault(); }
-    else if (e.key === "Home") { set(min); e.preventDefault(); }
-    else if (e.key === "End") { set(max); e.preventDefault(); }
-  });
+  MDS.ui.ctlKeys(el, { get: () => value, set, toNorm, fromNorm, min, max, initial });
 
   set(value, false);
   return { el, set, get: () => value };

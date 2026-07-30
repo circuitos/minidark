@@ -32,21 +32,27 @@ real leak; med = measurable waste or reachable bug; low = latent or cosmetic.
 | G1-1 | low | `css/theme.css` | Tokens `--c-black` and `--c-glass1` were defined but referenced nowhere. Deleted. |
 | G1-3 | low | `css/app.css` | `.strip .s-name` was declared in two adjacent identical-specificity rules. Merged. |
 
+## 1b. Fixed in the follow-up pass (all former medium-severity items)
+
+Design decisions taken, per finding:
+
+| ID | Where | Resolution |
+|---|---|---|
+| G2-1 | `js/engine/sequencer.js` | Underrun recovery added: after a stall past the lookahead, missed steps are SKIPPED (step/songPos resync to wall-clock musical time, like hardware dropping beats) instead of firing as a bunched burst. |
+| G2-2 | `js/engine/export.js` | Tail is now `TAIL` plus the longest release actually sounding in the chain's final bar (`tailSecs`, covered by a smoke test), so held pads and ringing strings export complete. |
+| G2-7 | `js/engine/synth.js`, `sequencer.js` | Voice registry per graph: `trigger()` registers every scheduled voice's amp; STOP calls `synth.killAll` which cancel-then-pins each amp and fades it in ~100 ms. Live keyboard notes and previews stay unregistered and unaffected. |
+| F13 | `js/ui/exportui.js` | Soft cap: song renders refuse beyond 300 bars with a clear message (`CONTENT.export.tooLong`); render + encode stay synchronous but bounded. |
+| F9 | `js/ui/exportui.js`, `js/main.js` | One shared `MDS.ui.download` (the append-and-remove variant); topbar SAVE now uses it. |
+| F10 | `js/ui/exportui.js`, `js/main.js` | The dialog's name input emits a `name` bus event; the topbar field subscribes. |
+| F1 | `js/ui/knob.js`, `js/ui/fader.js` | Shared `MDS.ui.ctlKeys` now owns the wheel / arrow-key / double-click contract for both widgets; the byte-identical copies are gone. Drag handling stays per-widget (genuinely different). |
+| F14 | `js/ui/panels.js` | One `sendKnobRow` helper builds the send knobs for both the INSTRUMENT group and the MIXER strips; the tooltip-suffix map exists once. |
+| F31 | `js/ui/panels.js` | `sel` events that keep the same selected track no longer rebuild the INSTRUMENT/LIBRARY tabs (wheel note nudges, key changes and scale-lock toggles used to tear them down per tick). |
+| F34 | `js/ui/panels.js` | 24 MB total cap on imported samples with a friendly refusal (`CONTENT.lib.samplesFull`), alongside the existing 8 MB per-file cap. |
+| F4 | `js/ui/meter.js` | The rAF loop idles until audio exists (no more per-frame layout reads against the hidden app), and a resize listener invalidates the cached bar heights so the peak tick stays true. |
+
 ## 2. Open, medium severity: discuss before fixing
 
-| ID | Effort | Where | Finding |
-|---|---|---|---|
-| G2-1 | small | `js/engine/sequencer.js:66` | No underrun recovery: a main-thread stall longer than the 0.12 s lookahead books every missed step in the past, so they fire as one bunched burst. Fix needs a design choice (skip vs compress missed steps). |
-| G2-2 | small | `js/engine/export.js:27` | Export tail is a fixed 2.5 s, ignoring `len` and release: a held pad or ringing guitar in the last bar exports audibly truncated. Tail should account for the longest sounding note. |
-| G2-7 | medium | `js/engine/sequencer.js:97` | STOP only halts future scheduling; already-booked steps still trigger and long voices ring on for seconds. Needs a per-track kill ramp or live-voice registry in synth.js. |
-| F13 | medium | `js/engine/export.js` | Song chain length is uncapped and both encoders run synchronously on the main thread with full-length allocations; a very long chain freezes the tab. Worth a soft cap or chunked encode. |
-| F9 | medium | `js/ui/exportui.js`, `js/main.js` | Two blob-download helpers have already drifted (one appends the anchor to the DOM, one does not). Should be one shared helper. |
-| F10 | small | `js/ui/exportui.js`, `js/main.js` | Renaming the project in the EXPORT dialog leaves the topbar name field stale (no bus event connects the two inputs). |
-| F1 | medium | `js/ui/fader.js`, `js/ui/knob.js` | The two widgets duplicate roughly half their bodies (wheel, keyboard, reset, aria plumbing, byte-identical). F2's fix landing twice is the cost made visible. Extract a shared interaction helper. |
-| F14 | trivial | `js/ui/panels.js` | Send-knob construction (incl. the tooltip-suffix map) duplicated verbatim between INSTRUMENT and MIXER; also another copy of the FX key list. Trivial to unify but touches the documented validate.mjs coupling, so listed rather than fixed. |
-| F31 | medium | `js/ui/panels.js` | renderInst rebuilds the whole tab (select + all knobs) on every `sel` and `patch` emit. Fine today; the cheap win is rebuilding only on actual track/engine change. |
-| F34 | small | `js/state.js`, `js/library.js` | Imported samples are held twice (base64 + decoded buffer) with a per-file cap but no total cap; SAVE stringifies all of it at once. A total-size cap with a friendly refusal would bound it. |
-| F4 | small | `js/ui/meter.js` | The bar-height cache reads 0 while the app is hidden pre-power-on (so the rAF loop forces a layout read per frame until then), and is never re-measured on resize, skewing the peak tick. |
+None. All eleven were resolved in the follow-up pass above.
 
 ## 3. Open, low severity
 

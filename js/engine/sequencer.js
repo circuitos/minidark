@@ -63,6 +63,20 @@ MDS.seq = (function () {
     const ctx = audio.ctx, g = audio.graph;
     const project = MDS.state.project, sel = MDS.state.sel;
     const now = ctx.currentTime;
+    // Underrun recovery: a main-thread stall longer than AHEAD would leave
+    // every missed step booked in the past, firing as one bunched burst.
+    // SKIP them instead (stay aligned with wall-clock musical time, like a
+    // hardware sequencer dropping beats) rather than compressing them.
+    if (nextTime < now) {
+      const sDur = stepDur(project);
+      const missed = Math.ceil((now - nextTime) / sDur);
+      const bars = Math.floor((step + missed) / 16);
+      step = (step + missed) % 16;
+      if (MDS.state.playMode === "song" && project.song.length) {
+        songPos = (songPos + bars) % project.song.length;
+      }
+      nextTime += missed * sDur;
+    }
     while (nextTime < now + AHEAD) {
       const sDur = stepDur(project);
       const pIdx = patternAt(project, sel, MDS.state.playMode, songPos);
@@ -99,6 +113,11 @@ MDS.seq = (function () {
     playing = false;
     clearInterval(timer); timer = null;
     tickQueue.length = 0;
+    // Silence already-booked voices (up to AHEAD in the future) and ringing
+    // tails; live keyboard notes are unregistered and keep sounding.
+    // (Guarded: the smoke test stubs MDS.synth with trigger only.)
+    const audio = MDS.state.audio;
+    if (audio && MDS.synth.killAll) MDS.synth.killAll(audio.graph, audio.ctx.currentTime + 0.001);
     MDS.bus.emit("transport");
   }
 

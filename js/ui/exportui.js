@@ -11,14 +11,17 @@ MDS.ui.exportDialog = (function () {
   const C = () => MDS.CONTENT.export;
   const S = () => MDS.state;
 
-  function download(blob, name) {
+  /* The one blob-download helper (topbar SAVE uses it too: two copies of
+     this had already drifted once). */
+  MDS.ui.download = function (blob, name) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = name;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
-  }
+  };
+  const download = MDS.ui.download;
 
   function radio(name, value, label, checked, tip) {
     const wrap = document.createElement("label");
@@ -40,7 +43,9 @@ MDS.ui.exportDialog = (function () {
     const nl = document.createElement("span"); nl.textContent = MDS.CONTENT.transport.projName;
     const nameIn = document.createElement("input");
     nameIn.type = "text"; nameIn.value = S().project.name;
-    nameIn.oninput = () => { S().project.name = nameIn.value; };
+    // "name" keeps the topbar field in step; the dialog is rebuilt per open,
+    // so the sync only needs to flow outward.
+    nameIn.oninput = () => { S().project.name = nameIn.value; MDS.bus.emit("name"); };
     nameWrap.append(nl, nameIn);
 
     /* scope */
@@ -80,6 +85,11 @@ MDS.ui.exportDialog = (function () {
       const scope = sSong.r.checked ? "song" : "pattern";
       if (scope === "song" && !S().project.song.length) {
         log.textContent = C().emptySong; log.className = "exp-note"; return;
+      }
+      // Soft cap: render + encode are synchronous full-length allocations, so
+      // an unbounded chain would freeze the tab or exhaust memory.
+      if (scope === "song" && S().project.song.length > 300) {
+        log.textContent = C().tooLong(S().project.song.length); log.className = "exp-note"; return;
       }
       const fmt = fMp3.r.checked ? "mp3" : fWebm.r.checked ? "webm" : "wav";
       render.disabled = true;

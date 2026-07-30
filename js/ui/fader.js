@@ -1,11 +1,11 @@
 /* ============================================================================
    ███ UI ███  fader.js — vertical linear fader for volume controls (per-track
    channel level and the master bus). Same interaction contract as the knob:
-   pointer drag (Shift = fine), wheel, double-click to reset, arrow-key
-   stepping (Up/Right increment, Down/Left decrement, Shift = fine, Home/End to
-   extremes), role="slider" with aria-valuemin/max/now, and a data-tt tooltip
-   trigger. Visual parameters come from THEME tokens; no colors or magic sizes
-   live here. Writes only to the caller's onInput handler.
+   pointer drag (Shift = fine), plus the wheel / arrow-key / double-click
+   behavior that MDS.ui.ctlKeys (js/ui/knob.js) owns for both widgets.
+   role="slider" with aria-valuemin/max/now and a data-tt tooltip trigger.
+   Visual parameters come from THEME tokens; no colors or magic sizes live
+   here. Writes only to the caller's onInput handler.
    ========================================================================== */
 window.MDS = window.MDS || {};
 MDS.ui = MDS.ui || {};
@@ -87,18 +87,7 @@ MDS.ui.fader = function (opts) {
   const end = () => { dragging = false; dragPos = null; el.classList.remove("is-active"); };
   el.addEventListener("pointerup", end);
   el.addEventListener("pointercancel", end);
-  el.addEventListener("dblclick", () => set(initial));
-  el.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    set(fromNorm(toNorm(value) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.03)));
-  }, { passive: false });
-  el.addEventListener("keydown", (e) => {
-    const step = e.shiftKey ? 0.01 : 0.04;
-    if (e.key === "ArrowUp" || e.key === "ArrowRight") { set(fromNorm(toNorm(value) + step)); e.preventDefault(); }
-    else if (e.key === "ArrowDown" || e.key === "ArrowLeft") { set(fromNorm(toNorm(value) - step)); e.preventDefault(); }
-    else if (e.key === "Home") { set(min); e.preventDefault(); }
-    else if (e.key === "End") { set(max); e.preventDefault(); }
-  });
+  MDS.ui.ctlKeys(el, { get: () => value, set, toNorm, fromNorm, min, max, initial });
 
   set(value, false);
   return { el, set, get: () => value };

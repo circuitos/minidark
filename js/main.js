@@ -52,6 +52,8 @@
     nameIn.value = S().project.name;
     nameIn.oninput = () => { S().project.name = nameIn.value; };
     MDS.bus.on("project", () => { nameIn.value = S().project.name; });
+    // the EXPORT dialog has a name field too; follow its edits live
+    MDS.bus.on("name", () => { nameIn.value = S().project.name; });
 
     const grow = el("span", "grow");
 
@@ -76,11 +78,7 @@
     const save = el("button", null, C().transport.save); save.dataset.tt = "save";
     save.onclick = () => {
       const blob = new Blob([S().toJSON()], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = MDS.exporter.filename(S().project, "minidark.json");
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      MDS.ui.download(blob, MDS.exporter.filename(S().project, "minidark.json"));
     };
 
     const openBtn = el("button", null, C().transport.open); openBtn.dataset.tt = "open";
